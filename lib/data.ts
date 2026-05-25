@@ -128,3 +128,71 @@ export const ANOMALIES = [
   { title: "4 Consecutive Winning Seasons (2023-26)", desc: "47→50→51→53 wins — first sustained competitive run since the Ewing 90s. First time in 27 years fans could plan playoff trips in January.", severity: "historic" as const },
   { title: "The Isiah Double Disaster (2006-08)", desc: "GM AND head coach simultaneously. 56-108 record. MSG sexual harassment lawsuit. Nuggets brawl. Eddy Curry trade. Jerome James contract. Historically bad.", severity: "catastrophic" as const },
 ];
+
+export const PAYROLL: Record<string, number> = {
+  "1998-99": 65,  "1999-00": 72,  "2000-01": 80,  "2001-02": 85,
+  "2002-03": 87,  "2003-04": 91,  "2004-05": 95,  "2005-06": 124,
+  "2006-07": 105, "2007-08": 119, "2008-09": 84,  "2009-10": 80,
+  "2010-11": 92,  "2011-12": 89,  "2012-13": 97,  "2013-14": 95,
+  "2014-15": 90,  "2015-16": 100, "2016-17": 110, "2017-18": 97,
+  "2018-19": 90,  "2019-20": 105, "2020-21": 125, "2021-22": 135,
+  "2022-23": 175, "2023-24": 210, "2024-25": 220, "2025-26": 235,
+};
+
+export const NEMESIS = [
+  {
+    team: "Indiana Pacers", bg: "#002D62", accent: "#FDBB30",
+    seriesW: 1, seriesL: 4,
+    note: "The franchise nemesis. Four playoff losses, including back-to-back ECF exits in 2025 and 2026.",
+    history: [
+      { year: "1999", round: "ECF", result: "W" as const, detail: "Won 4-2 — reached the NBA Finals" },
+      { year: "2000", round: "ECF", result: "L" as const, detail: "Lost 2-4 in Conference Finals" },
+      { year: "2013", round: "CSF", result: "L" as const, detail: "Lost 2-4 from a 54-win team" },
+      { year: "2024", round: "CSF", result: "L" as const, detail: "Lost 3-4 in brutal Game 7" },
+      { year: "2025", round: "ECF", result: "L" as const, detail: "Lost 2-4 in Conference Finals" },
+    ],
+  },
+  {
+    team: "Miami Heat", bg: "#98002E", accent: "#F9A01B",
+    seriesW: 1, seriesL: 2,
+    note: "The 1999 Houston shot is immortal. LeBron-era Heat dominated the post-2010 Knicks.",
+    history: [
+      { year: "1999", round: "R1",  result: "W" as const, detail: "Won 3-2 — The Allan Houston Shot" },
+      { year: "2012", round: "R1",  result: "L" as const, detail: "Lost 1-4 to LeBron's Heat" },
+      { year: "2023", round: "CSF", result: "L" as const, detail: "Lost 2-4 despite a 47-win season" },
+    ],
+  },
+  {
+    team: "Boston Celtics", bg: "#007A33", accent: "#BA9653",
+    seriesW: 1, seriesL: 1,
+    note: "Swept out in 2011. Revenge served ice cold in the 2025 Conference Semis.",
+    history: [
+      { year: "2011", round: "R1",  result: "L" as const, detail: "Lost 0-4 — embarrassed at home" },
+      { year: "2025", round: "CSF", result: "W" as const, detail: "Won 4-2 — finally, payback" },
+    ],
+  },
+  {
+    team: "Atlanta Hawks", bg: "#C8102E", accent: "#C1D32F",
+    seriesW: 2, seriesL: 1,
+    note: "Lost to a 5-seed in 2021. Won the rematch five years later to open the 2026 run.",
+    history: [
+      { year: "1999", round: "R2",  result: "W" as const, detail: "Won 4-0 en route to the Finals" },
+      { year: "2021", round: "R1",  result: "L" as const, detail: "Lost 1-4 — blown out by a 5-seed" },
+      { year: "2026", round: "R1",  result: "W" as const, detail: "Won 4-2 to open the 2026 run" },
+    ],
+  },
+];
+
+export const TIMELINE = [
+  { season: "1998-99", event: "8-Seed Finals",     type: "legendary" as const },
+  { season: "2000-01", event: "Ewing Traded",       type: "milestone" as const },
+  { season: "2004-05", event: "Isiah Takes Over",   type: "low"       as const },
+  { season: "2005-06", event: "$124M · 23 Wins",    type: "disaster"  as const },
+  { season: "2007-08", event: "Rock Bottom",         type: "disaster"  as const },
+  { season: "2011-12", event: "Linsanity",           type: "legendary" as const },
+  { season: "2014-15", event: "17-65 · KP Draft",   type: "disaster"  as const },
+  { season: "2017-18", event: "KP ACL · Melo Out",  type: "low"       as const },
+  { season: "2022-23", event: "Brunson Arrives",     type: "legendary" as const },
+  { season: "2023-24", event: "OG Trade",            type: "milestone" as const },
+  { season: "2024-25", event: "KAT + Bridges",       type: "milestone" as const },
+];

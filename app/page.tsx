@@ -1,24 +1,39 @@
 "use client";
-
+import { useState, useEffect, useRef } from "react";
 import { SEASONS, PLAYOFF_2026, ECF_STATS, ERA_COLORS, ERAS, ANOMALIES } from "@/lib/data";
 import {
-  AreaChart, Area, BarChart, Bar,
+  BarChart, Bar, AreaChart, Area, Line, ComposedChart,
   XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  Cell, ComposedChart, ReferenceLine, ScatterChart, Scatter, ZAxis,
-  Line,
+  Cell, ReferenceLine, ScatterChart, Scatter, ZAxis,
 } from "recharts";
-import { useState, useEffect } from "react";
 
-function abbr(s: string) { return `'${s.split("-")[0].slice(2)}`; }
+/* ── utils ─────────────────────────────────────────────── */
+const yr = (s: string) => `'${s.split("-")[0].slice(2)}`;
+const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
+/* ── Basketball SVG ────────────────────────────────────── */
+function Ball({ size = 72 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+      <circle cx="50" cy="50" r="48" fill="#F58426" />
+      <circle cx="50" cy="50" r="48" fill="none" stroke="#c0560c" strokeWidth="1.5" />
+      <path d="M50 2 Q20 30 20 50 Q20 70 50 98" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
+      <path d="M50 2 Q80 30 80 50 Q80 70 50 98" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
+      <path d="M2 50 Q26 28 50 28 Q74 28 98 50" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
+      <path d="M2 50 Q26 72 50 72 Q74 72 98 50" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
+    </svg>
+  );
+}
+
+/* ── Custom tooltip ────────────────────────────────────── */
 interface TipEntry { name?: string; value?: number | string; color?: string; }
 const Tip = ({ active, payload, label }: { active?: boolean; payload?: TipEntry[]; label?: string }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#1a1a2e] border border-[#333] rounded p-2 text-xs text-[#e0e0e0]">
-      <div className="font-bold mb-1" style={{ color: "#F58426" }}>{label}</div>
-      {payload.map((p: TipEntry, i: number) => (
-        <div key={i} style={{ color: p.color || "#ccc" }}>
+    <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#f1f5f9", boxShadow: "0 4px 12px rgba(0,0,0,.2)" }}>
+      <div style={{ fontWeight: 700, marginBottom: 4, color: "#F58426" }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ color: p.color || "#94a3b8" }}>
           {p.name}: {typeof p.value === "number" ? (p.value % 1 !== 0 ? p.value.toFixed(1) : p.value) : p.value}
         </div>
       ))}
@@ -26,55 +41,80 @@ const Tip = ({ active, payload, label }: { active?: boolean; payload?: TipEntry[
   );
 };
 
-function Ball({ size = 80 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
-      <circle cx="50" cy="50" r="48" fill="#F58426" />
-      <circle cx="50" cy="50" r="48" fill="none" stroke="#c0560c" strokeWidth="2" />
-      <path d="M 50 2 Q 20 30 20 50 Q 20 70 50 98" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
-      <path d="M 50 2 Q 80 30 80 50 Q 80 70 50 98" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
-      <path d="M 2 50 Q 26 28 50 28 Q 74 28 98 50" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
-      <path d="M 2 50 Q 26 72 50 72 Q 74 72 98 50" stroke="#7a2c00" strokeWidth="2.5" fill="none" />
-    </svg>
-  );
+/* ── Animated counter ──────────────────────────────────── */
+function Counter({ end, suffix = "" }: { end: number; suffix?: string }) {
+  const [val, setVal] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      obs.disconnect();
+      let start = 0;
+      const step = end / 40;
+      const t = setInterval(() => {
+        start += step;
+        if (start >= end) { setVal(end); clearInterval(t); }
+        else setVal(Math.round(start));
+      }, 30);
+    }, { threshold: 0.3 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [end]);
+  return <span ref={ref}>{val}{suffix}</span>;
 }
 
+/* ── Section wrapper ───────────────────────────────────── */
+const Sec = ({ id, children, cls = "" }: { id?: string; children: React.ReactNode; cls?: string }) => (
+  <section id={id} className={`px-4 sm:px-6 lg:px-8 py-10 sm:py-14 max-w-5xl mx-auto ${cls}`}>{children}</section>
+);
+
+/* ── Section header ────────────────────────────────────── */
+const Head = ({ label, title, sub }: { label: string; title: string; sub?: string }) => (
+  <div className="mb-8">
+    <div className="section-label">{label}</div>
+    <h2 className="section-title">{title}</h2>
+    {sub && <p className="section-sub">{sub}</p>}
+  </div>
+);
+
+/* ══════════════════════════════════════════════════════
+   MAIN
+══════════════════════════════════════════════════════ */
 export default function Home() {
-  const [selectedIdx, setSelectedIdx] = useState(SEASONS.length - 1);
+  const [selIdx, setSelIdx] = useState(SEASONS.length - 1);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const sel = SEASONS[selectedIdx];
+  const sel = SEASONS[selIdx];
 
+  /* derived */
   const totalW = SEASONS.reduce((a, s) => a + s.wins, 0);
-  const totalL = SEASONS.reduce((a, s) => a + s.losses, 0);
   const playoffSeasons = SEASONS.filter(s => s.playoffs !== "Missed");
   const missedCount = SEASONS.filter(s => s.playoffs === "Missed").length;
   const bestSeason = SEASONS.reduce((a, s) => s.pct > a.pct ? s : a);
-  const worstSeason = SEASONS.reduce((a, s) => s.pct < a.pct ? s : a);
 
+  /* chart data */
   const winData = SEASONS.map(s => ({
-    abbr: abbr(s.season),
-    wins: s.wins, losses: s.losses,
-    pct: +(s.pct * 100).toFixed(1),
+    y: yr(s.season), wins: s.wins, losses: 82 - s.wins,
     nRtg: +(s.offRtg - s.defRtg).toFixed(1),
+    pct: +(s.pct * 100).toFixed(1),
     fill: ERA_COLORS[s.era] || "#888",
   }));
 
-  const netRtgData = SEASONS.map(s => ({
-    abbr: abbr(s.season),
+  const netRtg = SEASONS.map(s => ({
+    y: yr(s.season),
     nRtg: +(s.offRtg - s.defRtg).toFixed(1),
-    offRtg: s.offRtg, defRtg: s.defRtg,
+    off: s.offRtg, def: s.defRtg,
   }));
 
-  const deltaData = SEASONS.slice(1).map((s, i) => {
-    const delta = s.wins - SEASONS[i].wins;
-    return { abbr: abbr(s.season), delta, fill: delta >= 0 ? "#22c55e" : "#ef4444" };
+  const delta = SEASONS.slice(1).map((s, i) => {
+    const d = s.wins - SEASONS[i].wins;
+    return { y: yr(s.season), d, fill: d >= 0 ? "#16a34a" : "#dc2626" };
   });
 
-  const brunsonEra = SEASONS.slice(-5).map(s => ({
-    season: s.season.slice(2),
-    wins: s.wins,
+  const brunsonArc = SEASONS.slice(-5).map(s => ({
+    s: s.season.slice(2), wins: s.wins,
     nRtg: +(s.offRtg - s.defRtg).toFixed(1),
+    ppg: s.leadPPG,
   }));
 
   const coachMap: Record<string, { w: number; l: number; apps: number }> = {};
@@ -85,624 +125,718 @@ export default function Home() {
     if (s.playoffs !== "Missed") coachMap[c].apps++;
   });
   const coaches = Object.entries(coachMap)
-    .map(([name, d]) => ({ name, ...d, pct: +(d.w / (d.w + d.l) * 100).toFixed(1) }))
+    .map(([name, d]) => ({ name, ...d, wpct: +(d.w / (d.w + d.l) * 100).toFixed(0) }))
     .sort((a, b) => b.w - a.w);
 
-  const scorerMap: Record<string, { seasons: number; ppg: number[] }> = {};
+  const scorerMap: Record<string, { n: number; ppg: number[] }> = {};
   SEASONS.forEach(s => {
-    if (!scorerMap[s.leadScorer]) scorerMap[s.leadScorer] = { seasons: 0, ppg: [] };
-    scorerMap[s.leadScorer].seasons++;
+    if (!scorerMap[s.leadScorer]) scorerMap[s.leadScorer] = { n: 0, ppg: [] };
+    scorerMap[s.leadScorer].n++;
     scorerMap[s.leadScorer].ppg.push(s.leadPPG);
   });
   const topScorers = Object.entries(scorerMap)
-    .map(([name, d]) => ({ name, seasons: d.seasons, avgPPG: +(d.ppg.reduce((a, v) => a + v, 0) / d.ppg.length).toFixed(1), maxPPG: Math.max(...d.ppg) }))
-    .sort((a, b) => b.seasons - a.seasons).slice(0, 8);
+    .map(([name, d]) => ({ name, n: d.n, avg: +(d.ppg.reduce((a,v)=>a+v,0)/d.ppg.length).toFixed(1), peak: Math.max(...d.ppg) }))
+    .sort((a, b) => b.n - a.n).slice(0, 8);
 
   const allGames = PLAYOFF_2026.flatMap(r => r.games.map(g => ({
-    label: `${r.round.split(" ")[0]} G${g.game}`,
-    brunson: g.brunsonPts, kat: g.katPts, bridges: g.bridgesPts,
-    win: g.result === "W",
+    l: `${r.round.split(" ")[0][0]}${r.round.split(" ")[0].length > 1 ? r.round.split(" ")[0].slice(1, 2) : ""} G${g.game}`,
+    jb: g.brunsonPts, kat: g.katPts, mb: g.bridgesPts, w: g.result === "W",
   })));
 
-  const coachNotes: Record<string, string> = {
-    "Jeff Van Gundy": "8-seed Finals run, 2 ECFs. Massively overperformed roster.",
-    "Tom Thibodeau": "4 straight winning seasons. First sustained success in 27 years.",
-    "Mike Woodson": "54-win season with Melo. Best record since 1997.",
-    "Isiah Thomas": "GM + Coach simultaneously. Historically disastrous dual role.",
-    "Larry Brown": "$124M payroll, 23 wins, fired after 1 season.",
-    "Mike D'Antoni": "Run-and-gun, no defense. Bridge era between disasters.",
+  const coachNote: Record<string, string> = {
+    "Jeff Van Gundy": "8-seed Finals run + 2 ECFs. Massively overperformed roster every year.",
+    "Tom Thibodeau": "4 straight winning seasons — first sustained success in 27 years.",
+    "Mike Woodson": "54-win season with Melo. Best record since 1996-97.",
+    "Isiah Thomas": "GM + Coach simultaneously. Historically disastrous dual-role experiment.",
+    "Larry Brown": "$124M payroll, 23 wins, fired after one season.",
+    "Mike D'Antoni": "Run-and-gun bridge era. Great offense, no defense.",
   };
 
   if (!mounted) return null;
 
-  const S = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
-    <div style={{ fontSize: 11, letterSpacing: 4, color: "#F58426", marginBottom: 4, ...style }}>{children}</div>
-  );
-  const Sub = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 14, letterSpacing: 1 }}>{children}</div>
-  );
-
+  /* ── Render ───────────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0e1a", fontFamily: "'Courier New', monospace" }}>
+    <div style={{ background: "var(--bg)", minHeight: "100vh", color: "var(--text)" }}>
 
-      {/* ── STICKY NAV ─────────────────────────────────────────────── */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 50, background: "#060a12", borderBottom: "1px solid #1e293b" }}>
-        <div style={{ display: "flex", overflowX: "auto", padding: "0 4px" }}>
-          {["Overview","Brunson Effect","Season Lens","Coaching","2026 Run","Anomalies"].map((label, i) => (
-            <a key={i} href={`#sec-${i}`} style={{ padding: "10px 12px", fontSize: 9, letterSpacing: 1.5, color: "#6b7280", textDecoration: "none", whiteSpace: "nowrap" }}>
-              {label.toUpperCase()}
-            </a>
-          ))}
+      {/* ══ STICKY NAV ════════════════════════════════════════════ */}
+      <nav style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(248,250,252,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14">
+          <div className="flex items-center gap-2">
+            <div style={{ width: 28, height: 28 }}><Ball size={28} /></div>
+            <span style={{ fontWeight: 800, fontSize: 14, color: "var(--blue)" }}>NYK FRANCHISE</span>
+          </div>
+          <div className="hidden sm:flex items-center gap-1">
+            {[["Overview","#overview"],["Brunson","#brunson"],["Seasons","#seasons"],["2026","#playoffs"],["Coaching","#coaching"],["Legends","#legends"]].map(([l, h]) => (
+              <a key={l} href={h} style={{ padding: "4px 10px", fontSize: 12, color: "var(--muted)", textDecoration: "none", borderRadius: 6, fontWeight: 500, transition: "color .15s" }}
+                 onMouseEnter={e => (e.currentTarget.style.color = "var(--blue)")}
+                 onMouseLeave={e => (e.currentTarget.style.color = "var(--muted)")}>
+                {l}
+              </a>
+            ))}
+          </div>
         </div>
       </nav>
 
-      {/* ── HERO ───────────────────────────────────────────────────── */}
-      <header style={{ background: "linear-gradient(135deg, #00264d 0%, #003d7a 35%, #006BB6 65%, #0085d1 80%, #F58426 100%)", padding: "40px 20px 32px", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, opacity: 0.05, backgroundImage: "repeating-linear-gradient(90deg,#fff 0,#fff 1px,transparent 1px,transparent 60px),repeating-linear-gradient(0deg,#fff 0,#fff 1px,transparent 1px,transparent 60px)" }} />
-        <div style={{ position: "absolute", top: 20, right: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-          <div className="ball-bounce"><Ball size={72} /></div>
-          <div className="ball-shadow" style={{ width: 40, height: 8, borderRadius: "50%", background: "rgba(0,0,0,0.4)" }} />
-        </div>
-        <div style={{ position: "relative" }}>
-          <div style={{ fontSize: 10, letterSpacing: 6, color: "#ffffff99", marginBottom: 6 }}>NEW YORK</div>
-          <div style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 0.9, letterSpacing: -2, textShadow: "0 4px 20px rgba(0,0,0,0.5)" }}>KNICKS</div>
-          <div style={{ fontSize: 11, letterSpacing: 3, color: "#ffffff80", marginTop: 8 }}>FRANCHISE DASHBOARD · 1999 FINALS → 2026 ECF</div>
-          <div style={{ display: "flex", gap: 24, marginTop: 24, flexWrap: "wrap" }}>
-            {[
-              { label: "ECF LEAD", val: "3-0", sub: "vs Cleveland", gold: true },
-              { label: "THIS SEASON", val: "53-29", sub: ".646 win%" },
-              { label: "PLAYOFF RECORD", val: "11-2", sub: "2026 run" },
-              { label: "NBA CUP", val: "★ CHAMPS", sub: "2025-26" },
-            ].map((s, i) => (
-              <div key={i} style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 8, letterSpacing: 2, color: "#ffffff80" }}>{s.label}</div>
-                <div style={{ fontSize: s.gold ? 28 : 22, fontWeight: 900, color: s.gold ? "#ffd700" : "#fff", textShadow: s.gold ? "0 0 20px rgba(255,215,0,0.5)" : "none" }}>{s.val}</div>
-                <div style={{ fontSize: 8, color: "#ffffff60" }}>{s.sub}</div>
+      {/* ══ HERO ══════════════════════════════════════════════════ */}
+      <header style={{ background: "linear-gradient(135deg, #002d5c 0%, #004a80 25%, #006BB6 60%, #0085d4 85%, #F58426 100%)", position: "relative", overflow: "hidden", padding: "0 16px" }}>
+        {/* court grid overlay */}
+        <div style={{ position: "absolute", inset: 0, opacity: 0.04, backgroundImage: "repeating-linear-gradient(90deg,#fff 0,#fff 1px,transparent 1px,transparent 56px),repeating-linear-gradient(0deg,#fff 0,#fff 1px,transparent 1px,transparent 56px)" }} />
+
+        <div className="max-w-5xl mx-auto py-12 sm:py-16 lg:py-20 relative">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-8">
+
+            {/* left: headline */}
+            <div className="fade-up">
+              <div style={{ fontSize: 10, letterSpacing: "0.25em", color: "rgba(255,255,255,0.6)", marginBottom: 8, textTransform: "uppercase" }}>New York</div>
+              <h1 style={{ fontSize: "clamp(52px,10vw,88px)", fontWeight: 900, color: "#fff", lineHeight: 0.9, letterSpacing: "-3px", textShadow: "0 4px 24px rgba(0,0,0,.3)" }}>
+                KNICKS
+              </h1>
+              <div style={{ fontSize: "clamp(13px,2vw,16px)", color: "rgba(255,255,255,0.6)", marginTop: 10, letterSpacing: "0.08em" }}>
+                Franchise Dashboard · 1999 Finals → 2026 ECF
               </div>
-            ))}
+
+              {/* hero chips */}
+              <div className="flex flex-wrap gap-2 mt-6">
+                {[
+                  { v: "3-0", l: "ECF Lead" },
+                  { v: "53-29", l: "This Season" },
+                  { v: "11-2", l: "Playoff Record" },
+                  { v: "★ Cup", l: "NBA Cup 2026" },
+                ].map(c => (
+                  <div key={c.l} className="hero-chip">
+                    <span className="hero-chip-v">{c.v}</span>
+                    <span className="hero-chip-l">{c.l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* right: bouncing ball */}
+            <div className="flex flex-col items-center gap-2 self-center sm:self-auto">
+              <div className="ball-anim"><Ball size={88} /></div>
+              <div className="shadow-anim" style={{ width: 50, height: 10, borderRadius: "50%", background: "rgba(0,0,0,0.35)" }} />
+            </div>
           </div>
         </div>
       </header>
 
-      {/* ── SECTION 0: OVERVIEW ────────────────────────────────────── */}
-      <section id="sec-0" style={{ padding: "24px 16px" }}>
-        <S>27 SEASONS AT A GLANCE</S>
-        <Sub>Complete franchise history — wins, losses, and the eras that defined them</Sub>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 20 }}>
+      {/* ══ BIG 4 STATS ═══════════════════════════════════════════ */}
+      <div id="overview" style={{ background: "var(--blue)", color: "#fff" }}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
           {[
-            { label: "ALL-TIME W-L", val: `${totalW}-${totalL}`, sub: `${(totalW/(totalW+totalL)*100).toFixed(0)}%` },
-            { label: "PLAYOFF APPS", val: String(playoffSeasons.length), sub: `${missedCount} missed` },
-            { label: "BEST SEASON", val: `${(bestSeason.pct*100).toFixed(0)}%`, sub: bestSeason.season },
-            { label: "WORST SEASON", val: `${(worstSeason.pct*100).toFixed(0)}%`, sub: worstSeason.season },
-          ].map((s, i) => (
-            <div key={i} style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 6, padding: "10px 8px", textAlign: "center" }}>
-              <div style={{ fontSize: 8, letterSpacing: 2, color: "#6b7280", marginBottom: 4 }}>{s.label}</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#F58426" }}>{s.val}</div>
-              <div style={{ fontSize: 9, color: "#9ca3af" }}>{s.sub}</div>
+            { n: totalW, label: "Career Wins", suf: "" },
+            { n: playoffSeasons.length, label: "Playoff Appearances", suf: "" },
+            { n: missedCount, label: "Missed Playoffs", suf: "" },
+            { n: +(bestSeason.pct * 100).toFixed(0), label: "Best Win %", suf: "%" },
+          ].map(({ n, label, suf }) => (
+            <div key={label} className="text-center">
+              <div className="stat-num" style={{ color: "#fff", letterSpacing: "-2px" }}>
+                <Counter end={n} suffix={suf} />
+              </div>
+              <div className="stat-label" style={{ color: "rgba(255,255,255,.65)" }}>{label}</div>
             </div>
           ))}
         </div>
+      </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>WINS BY SEASON — ERA COLORED</div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={winData} barGap={1} margin={{ left: -20, right: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="abbr" tick={{ fontSize: 7, fill: "#555" }} interval={2} />
-              <YAxis tick={{ fontSize: 8, fill: "#555" }} domain={[0, 82]} />
+      {/* ══ 27 SEASONS WINS ═══════════════════════════════════════ */}
+      <Sec>
+        <Head label="27 Seasons of Data" title="Win totals by season, era by era." sub="Every bar colored by the franchise era it represents. White dashed line = .500." />
+
+        <div className="lift p-5 sm:p-6 mb-5">
+          <div className="section-label mb-4">Wins per Season — Era Colored</div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={winData} margin={{ left: -16, right: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="y" tick={{ fontSize: 9, fill: "#94a3b8" }} interval={2} />
+              <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} domain={[0, 82]} />
               <Tooltip content={<Tip />} />
-              <ReferenceLine y={41} stroke="#ffffff15" strokeDasharray="4 4" />
-              <Bar dataKey="wins" name="Wins" radius={[2,2,0,0]}>
+              <ReferenceLine y={41} stroke="#94a3b8" strokeDasharray="4 4" />
+              <Bar dataKey="wins" name="Wins" radius={[3, 3, 0, 0]}>
                 {winData.map((d, i) => <Cell key={i} fill={d.fill} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+          {/* Era legend */}
+          <div className="flex flex-wrap gap-3 mt-4 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
             {ERAS.map(e => (
-              <div key={e.name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color }} />
-                <span style={{ fontSize: 8, color: "#6b7280" }}>{e.name}</span>
+              <div key={e.name} className="flex items-center gap-1.5">
+                <div style={{ width: 10, height: 10, borderRadius: 3, background: e.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>{e.name} <span style={{ color: "var(--subtle)" }}>({e.range})</span></span>
               </div>
             ))}
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>WIN % TREND</div>
-            <ResponsiveContainer width="100%" height={130}>
-              <AreaChart data={winData} margin={{ left: -28, right: 4 }}>
-                <defs><linearGradient id="pG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#F58426" stopOpacity={0.4}/><stop offset="100%" stopColor="#F58426" stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="abbr" tick={{ fontSize: 6, fill: "#555" }} interval={4} />
-                <YAxis tick={{ fontSize: 7, fill: "#555" }} domain={[15, 70]} />
+        {/* Win % + Net Rating */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
+          <div className="lift p-5">
+            <div className="section-label mb-3">Win % Trajectory</div>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={winData} margin={{ left: -24, right: 4 }}>
+                <defs>
+                  <linearGradient id="wG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#006BB6" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#006BB6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="y" tick={{ fontSize: 8, fill: "#94a3b8" }} interval={4} />
+                <YAxis tick={{ fontSize: 9, fill: "#94a3b8" }} domain={[15, 70]} />
                 <Tooltip content={<Tip />} />
-                <ReferenceLine y={50} stroke="#ffffff25" strokeDasharray="3 3" />
-                <Area type="monotone" dataKey="pct" name="Win %" stroke="#F58426" fill="url(#pG)" strokeWidth={2} dot={false} />
+                <ReferenceLine y={50} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Area type="monotone" dataKey="pct" name="Win %" stroke="#006BB6" fill="url(#wG)" strokeWidth={2.5} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: "#006BB6", marginBottom: 8 }}>NET RATING</div>
-            <ResponsiveContainer width="100%" height={130}>
-              <AreaChart data={netRtgData} margin={{ left: -28, right: 4 }}>
-                <defs><linearGradient id="nG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#006BB6" stopOpacity={0.4}/><stop offset="100%" stopColor="#006BB6" stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="abbr" tick={{ fontSize: 6, fill: "#555" }} interval={4} />
-                <YAxis tick={{ fontSize: 7, fill: "#555" }} />
+          <div className="lift p-5">
+            <div className="section-label mb-3" style={{ color: "var(--orange)" }}>Net Rating Over Time</div>
+            <ResponsiveContainer width="100%" height={160}>
+              <AreaChart data={netRtg} margin={{ left: -24, right: 4 }}>
+                <defs>
+                  <linearGradient id="nG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#F58426" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#F58426" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="y" tick={{ fontSize: 8, fill: "#94a3b8" }} interval={4} />
+                <YAxis tick={{ fontSize: 9, fill: "#94a3b8" }} />
                 <Tooltip content={<Tip />} />
-                <ReferenceLine y={0} stroke="#ffffff25" strokeDasharray="3 3" />
-                <Area type="monotone" dataKey="nRtg" name="Net Rtg" stroke="#006BB6" fill="url(#nG)" strokeWidth={2} dot={false} />
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Area type="monotone" dataKey="nRtg" name="Net Rtg" stroke="#F58426" fill="url(#nG)" strokeWidth={2.5} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>PLAYOFF DEPTH BY SEASON</div>
-          <ResponsiveContainer width="100%" height={110}>
-            <BarChart data={SEASONS.map(s => ({
-              abbr: abbr(s.season),
-              depth: s.playoffs === "NBA Finals" ? 4 : s.playoffs.includes("ECF") ? 3 : s.playoffs.includes("Semis") ? 2 : s.playoffs === "Missed" ? 0 : 1,
-            }))} margin={{ left: -20, right: 4 }}>
-              <XAxis dataKey="abbr" tick={{ fontSize: 7, fill: "#555" }} interval={2} />
-              <YAxis tick={{ fontSize: 8, fill: "#555" }} ticks={[0,1,2,3,4]} tickFormatter={v => (["","R1","R2","ECF","Fin"] as string[])[v] ?? ""} />
-              <Tooltip content={<Tip />} />
-              <Bar dataKey="depth" name="Round" radius={[2,2,0,0]}>
-                {SEASONS.map((s, i) => {
-                  const fill = s.playoffs === "NBA Finals" ? "#ffd700" : s.playoffs.includes("ECF") ? "#F58426" : s.playoffs.includes("Semis") ? "#22c55e" : s.playoffs === "Missed" ? "#1e293b" : "#6b7280";
-                  return <Cell key={i} fill={fill} />;
-                })}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 4 }}>YEAR-OVER-YEAR WIN SWINGS</div>
-          <div style={{ fontSize: 8, color: "#6b7280", marginBottom: 8 }}>Biggest collapses and turnarounds in franchise history</div>
-          <ResponsiveContainer width="100%" height={130}>
-            <BarChart data={deltaData} margin={{ left: -20, right: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="abbr" tick={{ fontSize: 7, fill: "#555" }} interval={2} />
-              <YAxis tick={{ fontSize: 8, fill: "#555" }} />
-              <Tooltip content={<Tip />} />
-              <ReferenceLine y={0} stroke="#ffffff25" />
-              <Bar dataKey="delta" name="Win Δ" radius={[2,2,0,0]}>
-                {deltaData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
-
-      {/* ── SECTION 1: BRUNSON EFFECT ──────────────────────────────── */}
-      <section id="sec-1" style={{ padding: "24px 16px", borderTop: "1px solid #1e293b" }}>
-        <S>THE BRUNSON EFFECT</S>
-        <Sub>What actually changed when Jalen Brunson arrived in 2022?</Sub>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-          {[
-            { title: "BEFORE BRUNSON", note: "2020-22 avg", color: "#ef4444", items: [["Avg Wins","33"],["Net Rtg","−2.4"],["Playoff Depth","R1 or miss"],["Top Scorer","Randle ~22ppg"],["Offense Rank","~21st"]] },
-            { title: "BRUNSON ERA", note: "2023-26 avg", color: "#F58426", items: [["Avg Wins","50.3 ↑53%"],["Net Rtg","+3.7 ↑6.1"],["Playoff Depth","Semis or ECF"],["Top Scorer","Brunson ~26ppg"],["Offense Rank","~5th"]] },
-          ].map((col, ci) => (
-            <div key={ci} style={{ background: "#0d1623", border: `1px solid ${ci === 0 ? "#1e293b" : "#006BB6"}`, borderRadius: 8, padding: 14 }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: col.color, marginBottom: 10 }}>{col.title} <span style={{ color: "#6b7280" }}>({col.note})</span></div>
-              {col.items.map(([k, v]) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11 }}>
-                  <span style={{ color: "#6b7280" }}>{k}</span>
-                  <span style={{ color: ci === 1 ? "#22c55e" : "#e8e0d4", fontWeight: 700 }}>{v}</span>
+        {/* Playoff depth + YoY swings */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="lift p-5">
+            <div className="section-label mb-3">Playoff Depth</div>
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart data={SEASONS.map(s => ({
+                y: yr(s.season),
+                d: s.playoffs === "NBA Finals" ? 4 : s.playoffs.includes("ECF") ? 3 : s.playoffs.includes("Semis") ? 2 : s.playoffs === "Missed" ? 0 : 1,
+                fill: s.playoffs === "NBA Finals" ? "#d97706" : s.playoffs.includes("ECF") ? "#F58426" : s.playoffs.includes("Semis") ? "#16a34a" : s.playoffs === "Missed" ? "#e2e8f0" : "#94a3b8",
+              }))} margin={{ left: -24, right: 4 }}>
+                <XAxis dataKey="y" tick={{ fontSize: 8, fill: "#94a3b8" }} interval={3} />
+                <YAxis tick={{ fontSize: 8, fill: "#94a3b8" }} ticks={[0,1,2,3,4]} tickFormatter={v => (["","R1","R2","ECF","Fin"] as string[])[v] ?? ""} />
+                <Tooltip content={<Tip />} />
+                <Bar dataKey="d" name="Round" radius={[2,2,0,0]}>
+                  {SEASONS.map((s, i) => {
+                    const f = s.playoffs === "NBA Finals" ? "#d97706" : s.playoffs.includes("ECF") ? "#F58426" : s.playoffs.includes("Semis") ? "#16a34a" : s.playoffs === "Missed" ? "#e2e8f0" : "#94a3b8";
+                    return <Cell key={i} fill={f} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-3 mt-3">
+              {[["#d97706","Finals"],["#F58426","ECF"],["#16a34a","Semis"],["#94a3b8","R1"],["#e2e8f0","Missed"]].map(([c,l]) => (
+                <div key={l} className="flex items-center gap-1">
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: c, border: "1px solid #e2e8f0", flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, color: "var(--muted)" }}>{l}</span>
                 </div>
               ))}
             </div>
-          ))}
+          </div>
+          <div className="lift p-5">
+            <div className="section-label mb-1">Year-over-Year Win Swings</div>
+            <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>How violently the Knicks yo-yoed</p>
+            <ResponsiveContainer width="100%" height={150}>
+              <BarChart data={delta} margin={{ left: -24, right: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="y" tick={{ fontSize: 8, fill: "#94a3b8" }} interval={3} />
+                <YAxis tick={{ fontSize: 8, fill: "#94a3b8" }} />
+                <Tooltip content={<Tip />} />
+                <ReferenceLine y={0} stroke="#94a3b8" />
+                <Bar dataKey="d" name="Win Δ" radius={[2,2,0,0]}>
+                  {delta.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </Sec>
+
+      <div className="ed-divider max-w-5xl mx-auto" />
+
+      {/* ══ BRUNSON EFFECT ════════════════════════════════════════ */}
+      <Sec id="brunson">
+        <Head label="The Transformation" title="What changed when Brunson arrived." sub="The single most impactful roster decision in 20 years — for $27M/year." />
+
+        {/* before / after big numbers */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+          <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "24px 28px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#dc2626", marginBottom: 16 }}>Before Brunson (2020–22 avg)</div>
+            <div className="grid grid-cols-2 gap-4">
+              {[["33","Avg Wins"],["−2.4","Net Rtg"],["21st","Off. Rank"],["R1/Miss","Playoff Depth"]].map(([v, l]) => (
+                <div key={l}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "#dc2626", letterSpacing: "-1px" }}>{v}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 12, padding: "24px 28px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--blue)", marginBottom: 16 }}>Brunson Era (2023–26 avg)</div>
+            <div className="grid grid-cols-2 gap-4">
+              {[["50.3","Avg Wins ↑53%"],["+3.7","Net Rtg ↑6.1"],["5th","Off. Rank"],["Semis/ECF","Playoff Depth"]].map(([v, l]) => (
+                <div key={l}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: "var(--blue)", letterSpacing: "-1px" }}>{v}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>BRUNSON-ERA WINS + NET RATING</div>
-          <ResponsiveContainer width="100%" height={150}>
-            <ComposedChart data={brunsonEra} margin={{ left: -20, right: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="season" tick={{ fontSize: 9, fill: "#6b7280" }} />
-              <YAxis yAxisId="l" tick={{ fontSize: 8, fill: "#6b7280" }} domain={[35, 60]} />
-              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 8, fill: "#6b7280" }} domain={[-1, 7]} />
+        {/* Brunson arc chart */}
+        <div className="lift p-5 mb-8">
+          <div className="section-label mb-1">5-Year Ascent</div>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Wins (bars) and Net Rating (dashed line) during the Brunson era</p>
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart data={brunsonArc} margin={{ left: -16, right: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="s" tick={{ fontSize: 11, fill: "#64748b" }} />
+              <YAxis yAxisId="l" tick={{ fontSize: 10, fill: "#94a3b8" }} domain={[35, 60]} />
+              <YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} domain={[-1, 7]} />
               <Tooltip content={<Tip />} />
-              <Bar yAxisId="l" dataKey="wins" name="Wins" fill="#006BB640" radius={[2,2,0,0]} />
-              <Line yAxisId="l" type="monotone" dataKey="wins" name="Wins" stroke="#006BB6" strokeWidth={2.5} dot={{ fill: "#006BB6", r: 4 }} />
-              <Line yAxisId="r" type="monotone" dataKey="nRtg" name="Net Rtg" stroke="#F58426" strokeWidth={2} dot={{ fill: "#F58426", r: 3 }} strokeDasharray="5 3" />
+              <Bar yAxisId="l" dataKey="wins" name="Wins" fill="#006BB625" radius={[3,3,0,0]} />
+              <Line yAxisId="l" type="monotone" dataKey="wins" name="Wins" stroke="#006BB6" strokeWidth={3} dot={{ fill: "#006BB6", r: 5, strokeWidth: 0 }} />
+              <Line yAxisId="r" type="monotone" dataKey="nRtg" name="Net Rtg" stroke="#F58426" strokeWidth={2} dot={{ fill: "#F58426", r: 4, strokeWidth: 0 }} strokeDasharray="6 3" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Research answers */}
-        <div style={{ display: "grid", gap: 12 }}>
-
+        {/* Research Q&A editorial cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-5">
           {/* False hope */}
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 4 }}>THE FALSE HOPE MACHINE</div>
-            <div style={{ fontSize: 9, color: "#9ca3af", marginBottom: 10, lineHeight: 1.6 }}>Did Knicks fans endure the longest false hope cycle in sports? The data says: probably yes. Three separate &ldquo;it&apos;s finally happening&rdquo; moments derailed within a year each time — until 2023.</div>
-            {[
-              { year: "1999", event: "NBA FINALS", type: "hope", note: "8-seed miracle" },
-              { year: "2001-09", event: "8 of 9 MISSED PLAYOFFS", type: "despair", note: "Isiah era abyss" },
-              { year: "2012-13", event: "54 WINS", type: "hope", note: "Division champs" },
-              { year: "2014-20", event: "17-65 TWICE", type: "despair", note: "7 misses in 8 years" },
-              { year: "2021", event: "BACK TO PLAYOFFS!", type: "hope", note: "Thibs miracle" },
-              { year: "2022", event: "MISSED AGAIN", type: "despair", note: "Sophomore slump" },
-              { year: "2023-26", event: "4 CONSECUTIVE DEEP RUNS", type: "sustained", note: "First real era since Ewing" },
-            ].map((ev, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 8px", borderRadius: 4, marginBottom: 4, background: ev.type === "hope" ? "#F5842615" : ev.type === "sustained" ? "#006BB615" : "#ef444415", borderLeft: `3px solid ${ev.type === "hope" ? "#F58426" : ev.type === "sustained" ? "#006BB6" : "#ef4444"}` }}>
-                <span style={{ fontSize: 8, color: "#6b7280", width: 44 }}>{ev.year}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, color: ev.type === "hope" ? "#F58426" : ev.type === "sustained" ? "#006BB6" : "#ef4444", flex: 1 }}>{ev.event}</span>
-                <span style={{ fontSize: 8, color: "#6b7280" }}>{ev.note}</span>
-              </div>
-            ))}
+          <div className="lift p-5 sm:col-span-1">
+            <div className="section-label">False Hope Machine?</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", marginBottom: 8, lineHeight: 1.25 }}>Yes — 3 waves of optimism, each crushed within a year.</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>1999 Finals → 8 dark years. 2013 title contention → 7 misses in 8 seasons. 2021 return → miss again. Until 2023, the Knicks could not sustain momentum.</div>
           </div>
-
-          {/* Melo reframed */}
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 4 }}>WAS MELO UNFAIRLY BLAMED?</div>
-            <div style={{ fontSize: 9, color: "#9ca3af", marginBottom: 10, lineHeight: 1.6 }}>Carmelo led the Knicks in scoring for 7 straight seasons. When given a functional roster (2013) he delivered 54 wins. The collapses were front office decisions, not Melo&apos;s performance.</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-              {[
-                { season: "2012-13", ppg: "28.7", wins: "54W", result: "Semis", ok: true },
-                { season: "2013-14", ppg: "27.4", wins: "37W", result: "Missed", ok: false },
-                { season: "2014-15", ppg: "24.2", wins: "17W", result: "Missed", ok: false },
-              ].map(r => (
-                <div key={r.season} style={{ background: "#0d1623", borderRadius: 6, padding: 8 }}>
-                  <div style={{ fontSize: 8, color: "#6b7280" }}>{r.season}</div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: "#F58426" }}>{r.ppg}</div>
-                  <div style={{ fontSize: 9, color: "#e8e0d4" }}>PPG · {r.wins}</div>
-                  <div style={{ fontSize: 8, color: r.ok ? "#22c55e" : "#ef4444", marginTop: 2 }}>{r.result}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: 8, background: "#006BB615", borderRadius: 4, borderLeft: "3px solid #006BB6" }}>
-              <div style={{ fontSize: 9, color: "#9ca3af", lineHeight: 1.6 }}><strong style={{ color: "#e8e0d4" }}>Verdict:</strong> When the Knicks gave Melo a real supporting cast, they won 54 games. Phil Jackson&apos;s triangle experiment — not Melo — caused the 17-65 season. The narrative was unfair.</div>
-            </div>
+          {/* Melo */}
+          <div className="lift p-5 sm:col-span-1">
+            <div className="section-label">Was Melo Blamed Unfairly?</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", marginBottom: 8, lineHeight: 1.25 }}>Yes. His 2013 team won 54 games. Then Phil broke everything.</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>When Melo had a real roster he delivered. Phil Jackson&apos;s triangle experiment — not Carmelo — caused the 17-65 disaster. The narrative was lazy and unfair.</div>
           </div>
-
           {/* Payroll */}
-          <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 4 }}>DID HIGH PAYROLL HURT?</div>
-            <div style={{ fontSize: 9, color: "#9ca3af", marginBottom: 10, lineHeight: 1.6 }}>The Knicks held top-5 NBA payrolls while posting sub-.350 records. Dolan wrote big checks to solve problems that required smart front office work, not money.</div>
+          <div className="lift p-5 sm:col-span-1">
+            <div className="section-label">Did High Payroll Hurt?</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text)", marginBottom: 8, lineHeight: 1.25 }}>Yes. $124M payroll → 23 wins in 2005-06.</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>Three top-5 NBA payrolls while posting sub-.350 records. Dolan wrote checks to fix problems that required smart roster construction, not money. 2026&apos;s $235M finally pays off.</div>
+          </div>
+        </div>
+
+        {/* Payroll bar chart */}
+        <div className="lift p-5">
+          <div className="section-label mb-3">Payroll vs Wins — Selected Seasons</div>
+          <div className="flex flex-col gap-3">
             {[
-              { s: "05-06", pay: "$124M", w: 23, bad: true },
-              { s: "06-07", pay: "$128M", w: 33, bad: true },
-              { s: "07-08", pay: "$119M", w: 23, bad: true },
-              { s: "12-13", pay: "$97M",  w: 54, bad: false },
-              { s: "23-24", pay: "$210M", w: 50, bad: false },
-              { s: "25-26", pay: "$235M", w: 53, bad: false },
+              { s: "2005-06", pay: "$124M", w: 23, cat: "bad" },
+              { s: "2007-08", pay: "$119M", w: 23, cat: "bad" },
+              { s: "2012-13", pay: "$97M",  w: 54, cat: "good" },
+              { s: "2023-24", pay: "$210M", w: 50, cat: "good" },
+              { s: "2025-26", pay: "$235M", w: 53, cat: "good" },
             ].map(r => (
-              <div key={r.s} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 9, color: "#6b7280", width: 34 }}>{r.s}</span>
-                <span style={{ fontSize: 9, color: "#e8e0d4", width: 38 }}>{r.pay}</span>
-                <div style={{ flex: 1, height: 6, background: "#1e293b", borderRadius: 3, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${(r.w/82)*100}%`, background: r.bad ? "#ef4444" : "#22c55e", borderRadius: 3 }} />
+              <div key={r.s} className="flex items-center gap-3">
+                <span style={{ fontSize: 11, color: "var(--muted)", width: 44, flexShrink: 0 }}>{r.s.slice(2)}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", width: 44, flexShrink: 0 }}>{r.pay}</span>
+                <div className="prog-track flex-1">
+                  <div className="prog-fill" style={{ width: `${(r.w / 82) * 100}%`, background: r.cat === "bad" ? "#dc2626" : "#16a34a" }} />
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: r.bad ? "#ef4444" : "#22c55e", width: 20 }}>{r.w}W</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: r.cat === "bad" ? "#dc2626" : "#16a34a", width: 28, textAlign: "right" }}>{r.w}W</span>
               </div>
             ))}
           </div>
         </div>
-      </section>
+      </Sec>
 
-      {/* ── SECTION 2: SEASON LENS ─────────────────────────────────── */}
-      <section id="sec-2" style={{ padding: "24px 16px", borderTop: "1px solid #1e293b" }}>
-        <S>SEASON EXPLORER</S>
-        <Sub>Select any of the 28 seasons for full breakdown</Sub>
+      <div className="ed-divider max-w-5xl mx-auto" />
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 16 }}>
+      {/* ══ SEASON EXPLORER ═══════════════════════════════════════ */}
+      <Sec id="seasons">
+        <Head label="Season Explorer" title="Drill into any of the 28 seasons." sub="Click a year for full stats, context, and key players." />
+
+        {/* Year picker */}
+        <div className="flex flex-wrap gap-1.5 mb-6">
           {SEASONS.map((s, i) => (
-            <button key={i} onClick={() => setSelectedIdx(i)} style={{ padding: "4px 6px", fontSize: 9, background: selectedIdx === i ? "#F58426" : "#1e293b", color: selectedIdx === i ? "#000" : "#9ca3af", border: `1px solid ${selectedIdx === i ? "#F58426" : "#374151"}`, borderRadius: 3, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>
-              {abbr(s.season).replace("'","")}
+            <button key={i} onClick={() => setSelIdx(i)} style={{
+              padding: "5px 9px", fontSize: 11, fontWeight: 700,
+              background: selIdx === i ? "var(--blue)" : "var(--surface)",
+              color: selIdx === i ? "#fff" : "var(--muted)",
+              border: `1px solid ${selIdx === i ? "var(--blue)" : "var(--border)"}`,
+              borderRadius: 6, cursor: "pointer", transition: "all .12s",
+            }}>
+              {yr(s.season).replace("'", "")}
             </button>
           ))}
         </div>
 
-        <div style={{ background: "#111827", border: `1px solid ${ERA_COLORS[sel.era] || "#1e293b"}`, borderRadius: 10, padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+        {/* Selected season card */}
+        <div className="lift overflow-hidden mb-8">
+          {/* header band */}
+          <div style={{ background: ERA_COLORS[sel.era] || "var(--blue)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#F58426" }}>{sel.season}</div>
-              <div style={{ fontSize: 10, color: "#6b7280", letterSpacing: 1 }}>{sel.era} · {sel.coach}</div>
+              <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{sel.season}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", marginTop: 2 }}>{sel.era} · {sel.coach}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: 30, fontWeight: 900, color: sel.pct >= 0.5 ? "#22c55e" : "#ef4444" }}>{sel.wins}-{sel.losses}</div>
-              <div style={{ fontSize: 10, color: "#9ca3af" }}>{(sel.pct*100).toFixed(1)}%</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#fff", letterSpacing: "-1px" }}>{sel.wins}-{sel.losses}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)" }}>{pct(sel.pct)} win rate</div>
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 12 }}>
-            {[
-              { label: "OFF RTG", val: sel.offRtg.toFixed(1), color: "#22c55e" },
-              { label: "DEF RTG", val: sel.defRtg.toFixed(1), color: "#ef4444" },
-              { label: "NET RTG", val: (sel.offRtg-sel.defRtg).toFixed(1), color: sel.offRtg-sel.defRtg>=0?"#22c55e":"#ef4444" },
-            ].map(r => (
-              <div key={r.label} style={{ background: "#0d1623", borderRadius: 6, padding: 8, textAlign: "center" }}>
-                <div style={{ fontSize: 8, letterSpacing: 1, color: "#6b7280" }}>{r.label}</div>
-                <div style={{ fontSize: 18, fontWeight: 900, color: r.color }}>{r.val}</div>
+          <div style={{ padding: "20px" }}>
+            {/* ratings */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {[
+                { l: "OffRtg", v: sel.offRtg.toFixed(1), good: sel.offRtg > 106 },
+                { l: "DefRtg", v: sel.defRtg.toFixed(1), good: sel.defRtg < 106 },
+                { l: "NetRtg", v: (sel.offRtg - sel.defRtg).toFixed(1), good: sel.offRtg - sel.defRtg > 0 },
+              ].map(r => (
+                <div key={r.l} style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 12px", textAlign: "center" }}>
+                  <div style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 4 }}>{r.l}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: r.good ? "var(--green)" : "var(--red)", letterSpacing: "-0.5px" }}>{r.v}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* stat leaders */}
+            <div className="grid grid-cols-3 gap-3 mb-5">
+              {[
+                { l: "Top Scorer", name: sel.leadScorer, stat: `${sel.leadPPG} PPG`, c: "var(--orange)" },
+                { l: "Top Rebounder", name: sel.leadRebounder, stat: `${sel.leadRPG} RPG`, c: "var(--blue)" },
+                { l: "Top Assists", name: sel.leadAssist, stat: `${sel.leadAPG} APG`, c: "#7c3aed" },
+              ].map(r => (
+                <div key={r.l} style={{ background: "var(--bg)", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 3 }}>{r.l}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>{r.name}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: r.c, letterSpacing: "-0.5px" }}>{r.stat}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* playoffs */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <span className="badge" style={{ background: sel.playoffs === "Missed" ? "#fee2e2" : "#dcfce7", color: sel.playoffs === "Missed" ? "#dc2626" : "#16a34a" }}>
+                {sel.playoffs === "Missed" ? "MISSED PLAYOFFS" : sel.playoffs.toUpperCase()}
+              </span>
+              {sel.seed && <span className="badge" style={{ background: "#fff4e6", color: "var(--orange)" }}>#{sel.seed} SEED</span>}
+              {sel.playoffs !== "Missed" && <span style={{ fontSize: 12, color: "var(--muted)" }}>{sel.playoffResult}</span>}
+            </div>
+
+            {/* all-stars */}
+            {sel.allStars.length > 0 && (
+              <div className="mb-4">
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--gold)", marginBottom: 6 }}>★ All-Stars</div>
+                <div className="flex flex-wrap gap-2">
+                  {sel.allStars.map(p => <span key={p} style={{ background: "#fef3c7", color: "#92400e", padding: "3px 10px", borderRadius: 999, fontSize: 12, fontWeight: 600 }}>{p}</span>)}
+                </div>
               </div>
-            ))}
-          </div>
+            )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-            {[
-              { label: "TOP SCORER",    player: sel.leadScorer,    stat: `${sel.leadPPG} PPG`, color: "#F58426" },
-              { label: "TOP REBOUNDER", player: sel.leadRebounder,  stat: `${sel.leadRPG} RPG`, color: "#006BB6" },
-              { label: "TOP ASSISTS",   player: sel.leadAssist,    stat: `${sel.leadAPG} APG`, color: "#8B5CF6" },
-            ].map(s => (
-              <div key={s.label} style={{ background: "#0d1623", borderRadius: 6, padding: 8 }}>
-                <div style={{ fontSize: 8, letterSpacing: 1, color: "#6b7280" }}>{s.label}</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#e8e0d4", marginTop: 2 }}>{s.player}</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: s.color }}>{s.stat}</div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: 8, letterSpacing: 1, color: "#6b7280" }}>PLAYOFFS: </span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: sel.playoffs === "Missed" ? "#ef4444" : "#22c55e" }}>{sel.playoffs}</span>
-            {sel.playoffs !== "Missed" && <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 8 }}>{sel.playoffResult}</span>}
-            {sel.seed && <span style={{ fontSize: 10, color: "#ffd700", marginLeft: 8 }}>#{sel.seed} seed</span>}
-          </div>
-
-          {sel.allStars.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 8, letterSpacing: 1, color: "#ffd700", marginBottom: 4 }}>★ ALL-STARS</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {sel.allStars.map(p => <span key={p} style={{ background: "#ffd70020", color: "#ffd700", padding: "2px 8px", borderRadius: 4, fontSize: 10 }}>{p}</span>)}
+            {/* key players */}
+            <div className="mb-5">
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 6 }}>Key Players</div>
+              <div className="flex flex-wrap gap-1.5">
+                {sel.keyPlayers.map(p => <span key={p} style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text)", padding: "3px 9px", borderRadius: 6, fontSize: 12 }}>{p}</span>)}
               </div>
             </div>
-          )}
 
-          <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 8, letterSpacing: 1, color: "#6b7280", marginBottom: 4 }}>KEY PLAYERS</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-              {sel.keyPlayers.map(p => <span key={p} style={{ background: "#1e293b", color: "#9ca3af", padding: "2px 6px", borderRadius: 3, fontSize: 9 }}>{p}</span>)}
+            {/* note */}
+            <div style={{ padding: "12px 16px", background: "#eff6ff", borderRadius: 8, borderLeft: `4px solid ${ERA_COLORS[sel.era] || "var(--blue)"}` }}>
+              <p style={{ fontSize: 13, color: "var(--text)", lineHeight: 1.6 }}>{sel.note}</p>
             </div>
-          </div>
-
-          <div style={{ padding: 10, background: "#0d1623", borderRadius: 6, borderLeft: `3px solid ${ERA_COLORS[sel.era] || "#F58426"}` }}>
-            <div style={{ fontSize: 10, color: "#e8e0d4", lineHeight: 1.6 }}>{sel.note}</div>
           </div>
         </div>
 
-        {/* Off vs Def scatter */}
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginTop: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 4 }}>OFFENSE vs DEFENSE — ALL SEASONS</div>
-          <div style={{ fontSize: 8, color: "#6b7280", marginBottom: 8 }}>Upper-left quadrant = elite two-way team</div>
-          <ResponsiveContainer width="100%" height={210}>
-            <ScatterChart margin={{ left: -10, right: 4, top: 10, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="offRtg" name="OffRtg" type="number" domain={[95, 122]} tick={{ fontSize: 8, fill: "#555" }} label={{ value: "OffRtg →", position: "insideBottom", offset: -2, fill: "#555", fontSize: 8 }} />
-              <YAxis dataKey="defRtg" name="DefRtg" type="number" domain={[93, 116]} reversed tick={{ fontSize: 8, fill: "#555" }} label={{ value: "← DefRtg", angle: -90, position: "insideLeft", fill: "#555", fontSize: 8 }} />
-              <ZAxis range={[40, 40]} />
+        {/* Offense vs Defense scatter */}
+        <div className="lift p-5">
+          <div className="section-label mb-1">Offense vs Defense — All 28 Seasons</div>
+          <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Top-left = elite two-way team. Bottom-right = bad offense AND defense.</p>
+          <ResponsiveContainer width="100%" height={240}>
+            <ScatterChart margin={{ left: -8, right: 8, top: 8, bottom: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="offRtg" name="OffRtg" type="number" domain={[95, 122]} tick={{ fontSize: 10, fill: "#94a3b8" }} label={{ value: "Offensive Rating →", position: "insideBottom", offset: -8, fill: "#94a3b8", fontSize: 10 }} />
+              <YAxis dataKey="defRtg" name="DefRtg" type="number" domain={[93, 116]} reversed tick={{ fontSize: 10, fill: "#94a3b8" }} label={{ value: "Defensive Rating", angle: -90, position: "insideLeft", fill: "#94a3b8", fontSize: 10, dx: 10 }} />
+              <ZAxis range={[50, 50]} />
               <Tooltip content={({ active, payload }) => {
                 if (!active || !payload?.length) return null;
                 const d = payload[0].payload as typeof SEASONS[0];
                 return (
-                  <div style={{ background: "#1a1a2e", border: "1px solid #333", borderRadius: 6, padding: "6px 10px", fontSize: 10 }}>
+                  <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#f1f5f9" }}>
                     <div style={{ color: "#F58426", fontWeight: 700 }}>{d.season}</div>
-                    <div>Off: {d.offRtg?.toFixed(1)}</div>
-                    <div>Def: {d.defRtg?.toFixed(1)}</div>
-                    <div style={{ color: "#22c55e" }}>Net: {((d.offRtg||0)-(d.defRtg||0)).toFixed(1)}</div>
+                    <div>Off: {d.offRtg?.toFixed(1)} · Def: {d.defRtg?.toFixed(1)}</div>
+                    <div style={{ color: "#4ade80" }}>Net: {((d.offRtg||0)-(d.defRtg||0)).toFixed(1)}</div>
                   </div>
                 );
               }} />
-              <Scatter data={SEASONS} fill="#F58426">
+              <Scatter data={SEASONS} fill="#006BB6">
                 {SEASONS.map((s, i) => <Cell key={i} fill={ERA_COLORS[s.era] || "#888"} />)}
               </Scatter>
             </ScatterChart>
           </ResponsiveContainer>
         </div>
-      </section>
+      </Sec>
 
-      {/* ── SECTION 3: COACHING ────────────────────────────────────── */}
-      <section id="sec-3" style={{ padding: "24px 16px", borderTop: "1px solid #1e293b" }}>
-        <S>COACHING RECORDS</S>
-        <Sub>Which coaches squeezed the most out of their rosters?</Sub>
+      <div className="ed-divider max-w-5xl mx-auto" />
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          {coaches.map((c, i) => (
-            <div key={c.name} style={{ marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: i === 0 ? "#F58426" : "#6b7280" }}>#{i+1}</div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#e8e0d4" }}>{c.name}</div>
-                    <div style={{ fontSize: 8, color: "#6b7280" }}>{c.apps} playoff appearance{c.apps !== 1 ? "s" : ""}</div>
+      {/* ══ 2026 PLAYOFF RUN ══════════════════════════════════════ */}
+      <Sec id="playoffs">
+        <Head label="Live 2026 Playoffs" title="11-2 record. One win from the Finals." sub="Game-by-game log for all 13 playoff games. Brunson / KAT / Bridges scoring breakdown." />
+
+        {/* Round cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+          {PLAYOFF_2026.map((round, ri) => (
+            <div key={ri} className="lift overflow-hidden">
+              <div style={{ background: ri === 2 ? "#d97706" : ri === 1 ? "var(--green)" : "var(--blue)", padding: "10px 16px" }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>{round.round}</div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,.75)" }}>{round.result}</div>
+              </div>
+              <div style={{ padding: "10px 12px" }}>
+                {round.games.map(g => (
+                  <div key={g.game} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 0", borderBottom: "1px solid #f1f5f9" }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: g.result === "W" ? "var(--green)" : "var(--red)", width: 12 }}>{g.result}</span>
+                    <span style={{ fontSize: 11, color: "var(--text)", fontWeight: 600, flex: 1 }}>{g.score}</span>
+                    <span style={{ fontSize: 8, color: "var(--muted)", width: 24 }}>{g.loc}</span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <span style={{ fontSize: 9, color: "var(--orange)", fontWeight: 700 }}>{g.brunsonPts}</span>
+                      <span style={{ fontSize: 9, color: "var(--blue)", fontWeight: 700 }}>{g.katPts}</span>
+                      <span style={{ fontSize: 9, color: "var(--green)", fontWeight: 700 }}>{g.bridgesPts}</span>
+                    </div>
                   </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, fontWeight: 900, color: +c.pct >= 50 ? "#22c55e" : "#ef4444" }}>{c.pct}%</div>
-                  <div style={{ fontSize: 8, color: "#6b7280" }}>{c.w}-{c.l}</div>
-                </div>
-              </div>
-              <div style={{ height: 4, background: "#1e293b", borderRadius: 3, overflow: "hidden", marginBottom: 3 }}>
-                <div style={{ height: "100%", width: `${(c.w/(c.w+c.l))*100}%`, background: +c.pct >= 50 ? "#22c55e" : "#ef4444", borderRadius: 3 }} />
-              </div>
-              {coachNotes[c.name] && <div style={{ fontSize: 8, color: "#6b7280", fontStyle: "italic" }}>{coachNotes[c.name]}</div>}
-            </div>
-          ))}
-        </div>
-
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>LEADING SCORER BY # SEASONS LED</div>
-          {topScorers.map((p, i) => (
-            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "#F58426", width: 16 }}>{i+1}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#e8e0d4" }}>{p.name}</div>
-                <div style={{ fontSize: 8, color: "#6b7280" }}>avg {p.avgPPG} PPG · peak {p.maxPPG}</div>
-              </div>
-              <div style={{ display: "flex", gap: 2 }}>
-                {Array.from({ length: p.seasons }).map((_, j) => (
-                  <div key={j} style={{ width: 8, height: 20, background: "#F58426", borderRadius: 2, opacity: 0.6 + j * 0.05 }} />
                 ))}
               </div>
-              <div style={{ fontSize: 11, color: "#9ca3af", width: 16 }}>{p.seasons}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>OVERRATED vs UNDERRATED</div>
-          {[
-            { name: "Stephon Marbury",    verdict: "overrated",   reason: "Elite stats, 0 playoff wins. Left for China. Culture cancer." },
-            { name: "Amar'e Stoudemire",  verdict: "overrated",   reason: "Brilliant debut season, then knees. $100M in hindsight." },
-            { name: "Kristaps Porzingis", verdict: "overrated",   reason: "Unicorn ceiling never realized. ACL + front office drama." },
-            { name: "David Lee",          verdict: "underrated",  reason: "Two All-Star seasons in NY. Traded just as team was built around him." },
-            { name: "Allan Houston",      verdict: "underrated",  reason: "Carried bad Knicks teams for years. The shot vs Miami is Knicks lore." },
-            { name: "Josh Hart",          verdict: "underrated",  reason: "The engine behind every Brunson lineup. Hustle plays no one else makes." },
-            { name: "Jalen Brunson",      verdict: "elite",       reason: "$27M/yr turning the Knicks into perennial contenders. Best value in NBA?" },
-          ].map(p => (
-            <div key={p.name} style={{ display: "flex", gap: 8, padding: "6px 8px", borderRadius: 4, marginBottom: 4, background: p.verdict==="overrated"?"#ef444410":p.verdict==="elite"?"#006BB615":"#22c55e10", borderLeft:`3px solid ${p.verdict==="overrated"?"#ef4444":p.verdict==="elite"?"#006BB6":"#22c55e"}` }}>
-              <span style={{ fontSize: 8, color: p.verdict==="overrated"?"#ef4444":p.verdict==="elite"?"#006BB6":"#22c55e", width: 60, flexShrink: 0, marginTop: 1, letterSpacing: 0.5 }}>{p.verdict.toUpperCase()}</span>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#e8e0d4" }}>{p.name}</div>
-                <div style={{ fontSize: 9, color: "#9ca3af", lineHeight: 1.4 }}>{p.reason}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── SECTION 4: 2026 PLAYOFF RUN ────────────────────────────── */}
-      <section id="sec-4" style={{ padding: "24px 16px", borderTop: "1px solid #1e293b" }}>
-        <S>2025-26 PLAYOFF RUN</S>
-        <Sub>11-2 record · 3-0 in ECF · One win from the Finals</Sub>
-
-        {PLAYOFF_2026.map((round, ri) => (
-          <div key={ri} style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 900, color: ri === 2 ? "#ffd700" : "#F58426", marginBottom: 8 }}>{round.round} — {round.result}</div>
-            {round.games.map(g => (
-              <div key={g.game} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 4, background: "#0d1623", borderLeft: `3px solid ${g.result==="W"?"#22c55e":"#ef4444"}`, marginBottom: 4 }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: g.result==="W"?"#22c55e":"#ef4444", width: 12 }}>{g.result}</span>
-                <span style={{ fontSize: 10, color: "#e8e0d4", width: 56 }}>{g.score}</span>
-                <span style={{ fontSize: 8, color: "#6b7280", width: 28 }}>{g.loc}</span>
-                <div style={{ flex: 1, display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                  <span style={{ fontSize: 9, color: "#F58426" }}>JB {g.brunsonPts}</span>
-                  <span style={{ fontSize: 9, color: "#006BB6" }}>KAT {g.katPts}</span>
-                  <span style={{ fontSize: 9, color: "#22c55e" }}>MB {g.bridgesPts}</span>
-                </div>
+        {/* Stacked scoring chart */}
+        <div className="lift p-5 mb-5">
+          <div className="section-label mb-1">Big 3 Scoring — All 13 Games</div>
+          <div className="flex gap-4 mb-4">
+            {[["var(--orange)","Brunson"],["var(--blue)","KAT"],["var(--green)","Bridges"]].map(([c,n]) => (
+              <div key={n} className="flex items-center gap-1.5">
+                <div style={{ width: 10, height: 10, borderRadius: 2, background: c, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>{n}</span>
               </div>
             ))}
           </div>
-        ))}
-
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>BIG 3 SCORING — ALL 13 GAMES</div>
-          <ResponsiveContainer width="100%" height={150}>
-            <BarChart data={allGames} margin={{ left: -20, right: 4 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 7, fill: "#555" }} />
-              <YAxis tick={{ fontSize: 8, fill: "#555" }} />
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={allGames} margin={{ left: -16, right: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="l" tick={{ fontSize: 8, fill: "#94a3b8" }} />
+              <YAxis tick={{ fontSize: 9, fill: "#94a3b8" }} />
               <Tooltip content={<Tip />} />
-              <Bar dataKey="brunson" name="Brunson" fill="#F58426" stackId="a" />
+              <Bar dataKey="jb" name="Brunson" fill="#F58426" stackId="a" />
               <Bar dataKey="kat" name="KAT" fill="#006BB6" stackId="a" />
-              <Bar dataKey="bridges" name="Bridges" fill="#22c55e" stackId="a" radius={[2,2,0,0]} />
+              <Bar dataKey="mb" name="Bridges" fill="#16a34a" stackId="a" radius={[2,2,0,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#ffd700", marginBottom: 8 }}>ECF PLAYER STATS vs CLEVELAND</div>
+        {/* ECF stats table */}
+        <div className="lift overflow-hidden">
+          <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)" }}>
+            <div className="section-label" style={{ color: "var(--gold)" }}>ECF Player Stats vs Cleveland</div>
+          </div>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+            <table className="data-table">
               <thead>
-                <tr style={{ borderBottom: "1px solid #1e293b" }}>
-                  {["PLAYER","PTS","REB","AST","FG%","3P%","+/-"].map(h => (
-                    <th key={h} style={{ padding: "4px 4px", textAlign: h==="PLAYER"?"left":"right", color: "#6b7280", fontSize: 8, letterSpacing: 1 }}>{h}</th>
-                  ))}
+                <tr>
+                  {["Player","PTS","REB","AST","FG%","3P%","+/-"].map(h => <th key={h} style={{ textAlign: h === "Player" ? "left" : "right" }}>{h}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {ECF_STATS.map((p, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #1e293b33" }}>
-                    <td style={{ padding: "5px 4px", fontWeight: 700, color: p.role==="Star"?"#F58426":p.role==="Core"?"#9ca3af":"#6b7280" }}>{p.name}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", color: "#e8e0d4" }}>{p.pts.toFixed(1)}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", color: "#e8e0d4" }}>{p.reb.toFixed(1)}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", color: "#e8e0d4" }}>{p.ast.toFixed(1)}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", color: p.fgPct>=50?"#22c55e":"#e8e0d4" }}>{p.fgPct.toFixed(1)}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", color: p.threePct>=40?"#22c55e":"#e8e0d4" }}>{p.threePct.toFixed(0)}</td>
-                    <td style={{ padding: "5px 4px", textAlign: "right", fontWeight: 700, color: p.pm>0?"#22c55e":p.pm<0?"#ef4444":"#9ca3af" }}>{p.pm>0?"+":""}{p.pm}</td>
+                  <tr key={i} className="row-hover">
+                    <td style={{ fontWeight: 700, color: p.role === "Star" ? "var(--blue)" : p.role === "Core" ? "var(--text)" : "var(--muted)" }}>{p.name}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700 }}>{p.pts.toFixed(1)}</td>
+                    <td style={{ textAlign: "right" }}>{p.reb.toFixed(1)}</td>
+                    <td style={{ textAlign: "right" }}>{p.ast.toFixed(1)}</td>
+                    <td style={{ textAlign: "right", color: p.fgPct >= 50 ? "var(--green)" : "var(--text)" }}>{p.fgPct.toFixed(1)}</td>
+                    <td style={{ textAlign: "right", color: p.threePct >= 40 ? "var(--green)" : "var(--text)" }}>{p.threePct.toFixed(0)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 800, color: p.pm > 0 ? "var(--green)" : p.pm < 0 ? "var(--red)" : "var(--muted)" }}>{p.pm > 0 ? "+" : ""}{p.pm}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
-      </section>
+      </Sec>
 
-      {/* ── SECTION 5: ANOMALIES ───────────────────────────────────── */}
-      <section id="sec-5" style={{ padding: "24px 16px", borderTop: "1px solid #1e293b" }}>
-        <S>OUTLIERS & LEGENDS</S>
-        <Sub>The moments that defined 27 years of Knicks fandom</Sub>
+      <div className="ed-divider max-w-5xl mx-auto" />
 
-        {ANOMALIES.map((a, i) => {
-          const c = {
-            legendary: { bg: "#ffd70015", border: "#ffd700", badge: "#ffd700", label: "LEGENDARY" },
-            historic:  { bg: "#22c55e15", border: "#22c55e", badge: "#22c55e", label: "HISTORIC" },
-            catastrophic: { bg: "#ef444415", border: "#ef4444", badge: "#ef4444", label: "CATASTROPHIC" },
-          }[a.severity];
-          return (
-            <div key={i} style={{ background: c.bg, borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: `3px solid ${c.border}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-                <div style={{ fontSize: 12, fontWeight: 900, color: "#e8e0d4", paddingRight: 8 }}>{a.title}</div>
-                <span style={{ fontSize: 7, letterSpacing: 1, color: c.badge, background: `${c.badge}20`, padding: "2px 6px", borderRadius: 3, flexShrink: 0 }}>{c.label}</span>
-              </div>
-              <div style={{ fontSize: 10, color: "#9ca3af", lineHeight: 1.6 }}>{a.desc}</div>
-            </div>
-          );
-        })}
+      {/* ══ COACHING ══════════════════════════════════════════════ */}
+      <Sec id="coaching">
+        <Head label="Coaching Records" title="Who squeezed the most from the roster?" sub="27 years of head coaches ranked by win percentage and playoff success." />
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginTop: 8 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>BEST ROSTER CHEMISTRY</div>
-          {[
-            { name: "2025-26 Brunson Core", players: "Brunson-KAT-Bridges-OG-Hart", why: "Villanova pipeline + complementary trades. First time every role was crystal clear.", score: 95 },
-            { name: "1998-99 Finals Run", players: "Sprewell-Houston-Ewing-Johnson-Camby", why: "6th-man mentality top to bottom. Van Gundy unlocked something no one expected.", score: 90 },
-            { name: "2012-13 Woodson Squad", players: "Melo-JR-Chandler-Kidd-Felton", why: "Best defensive core + elite scoring. JR Smith 6MOY. 54 wins felt earned.", score: 82 },
-          ].map((t, i) => (
-            <div key={i} style={{ background: "#0d1623", borderRadius: 6, padding: 10, marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#e8e0d4" }}>{t.name}</div>
-                <div style={{ fontSize: 14, fontWeight: 900, color: "#F58426" }}>{t.score}/100</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-8">
+          <div className="lift p-5">
+            <div className="section-label mb-4">Win % by Coach</div>
+            {coaches.map((c) => (
+              <div key={c.name} style={{ marginBottom: 14 }}>
+                <div className="flex justify-between items-start mb-1.5">
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{c.name}</span>
+                    <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: 6 }}>{c.w}-{c.l} · {c.apps} PO</span>
+                  </div>
+                  <span style={{ fontSize: 15, fontWeight: 900, color: +c.wpct >= 50 ? "var(--green)" : "var(--red)" }}>{c.wpct}%</span>
+                </div>
+                <div className="prog-track">
+                  <div className="prog-fill" style={{ width: `${(c.w/(c.w+c.l))*100}%`, background: +c.wpct >= 50 ? "#16a34a" : "#dc2626" }} />
+                </div>
+                {coachNote[c.name] && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, lineHeight: 1.4 }}>{coachNote[c.name]}</div>}
               </div>
-              <div style={{ fontSize: 9, color: "#6b7280", marginBottom: 4 }}>{t.players}</div>
-              <div style={{ fontSize: 9, color: "#9ca3af", lineHeight: 1.4, marginBottom: 6 }}>{t.why}</div>
-              <div style={{ height: 4, background: "#1e293b", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${t.score}%`, background: "#F58426", borderRadius: 2 }} />
+            ))}
+          </div>
+
+          {/* Leading scorers */}
+          <div className="lift p-5">
+            <div className="section-label mb-4">Leading Scorer Most Seasons</div>
+            {topScorers.map((p, i) => (
+              <div key={p.name} className="flex items-center gap-3 mb-4">
+                <div style={{ fontSize: 18, fontWeight: 900, color: i === 0 ? "var(--orange)" : i <= 2 ? "var(--blue)" : "var(--muted)", width: 20, flexShrink: 0 }}>{i + 1}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                  <div style={{ fontSize: 10, color: "var(--muted)" }}>avg {p.avg} PPG · peak {p.peak}</div>
+                </div>
+                <div className="flex gap-0.5">
+                  {Array.from({ length: p.n }).map((_, j) => (
+                    <div key={j} style={{ width: 7, height: 22, background: "var(--orange)", borderRadius: 2, opacity: 0.5 + j * 0.1 }} />
+                  ))}
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", width: 14, textAlign: "right" }}>{p.n}</span>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div style={{ background: "#111827", border: "1px solid #1e293b", borderRadius: 8, padding: 14, marginTop: 12 }}>
-          <div style={{ fontSize: 9, letterSpacing: 2, color: "#F58426", marginBottom: 8 }}>HOTTEST AT THE RIGHT TIME</div>
-          {[
-            { yr: "1999", ctx: "Beat #1 Miami as 8-seed → went all the way to Finals", peak: "Sprewell 22 PPG through Finals run" },
-            { yr: "Feb 2012", ctx: "Linsanity — 7-game win streak from complete obscurity", peak: "Lin 22.5 PPG over the stretch" },
-            { yr: "2026", ctx: "11-2 in playoffs. Swept Philly. Up 3-0 in ECF", peak: "Brunson 30+ PPG in ECF" },
-          ].map((h, i) => (
-            <div key={i} style={{ display: "flex", gap: 10, padding: "8px 10px", background: "#0d1623", borderRadius: 4, borderLeft: "3px solid #ffd700", marginBottom: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 900, color: "#ffd700", width: 48, flexShrink: 0 }}>{h.yr}</div>
-              <div>
-                <div style={{ fontSize: 10, color: "#e8e0d4", marginBottom: 2 }}>{h.ctx}</div>
-                <div style={{ fontSize: 9, color: "#6b7280" }}>{h.peak}</div>
-              </div>
-            </div>
-          ))}
+        {/* Overrated vs underrated */}
+        <div className="lift p-5">
+          <div className="section-label mb-4">Overrated vs Underrated — The Honest List</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { name: "Stephon Marbury",    v: "overrated",   r: "Elite stats, 0 playoff wins. Left for China. Made every locker room worse." },
+              { name: "Amar'e Stoudemire",  v: "overrated",   r: "MVP-level debut, then knees ended it. $100M in hindsight." },
+              { name: "Kristaps Porzingis", v: "overrated",   r: "Unicorn potential never realized. ACL + trade demand + front office chaos." },
+              { name: "David Lee",          v: "underrated",  r: "Two All-Star caliber seasons in NY. Traded just as team was building." },
+              { name: "Allan Houston",      v: "underrated",  r: "Carried bad teams for years. His 1999 shot vs Miami is immortal." },
+              { name: "Josh Hart",          v: "underrated",  r: "The invisible engine of every Brunson lineup. Hustle plays nobody else makes." },
+              { name: "Jalen Brunson",      v: "elite",       r: "$27M/yr → perennial contender. Best value contract in modern NBA?" },
+              { name: "Julius Randle",      v: "complicated", r: "One brilliant year (2021 MIP), then inconsistency. Still meaningful contributor." },
+            ].map(p => {
+              const colors: Record<string,{bg:string;text:string;badge:string}> = {
+                overrated: { bg: "#fee2e2", text: "#dc2626", badge: "#dc2626" },
+                underrated: { bg: "#dcfce7", text: "#16a34a", badge: "#16a34a" },
+                elite:      { bg: "#eff6ff", text: "#006BB6", badge: "#006BB6" },
+                complicated:{ bg: "#fef3c7", text: "#d97706", badge: "#d97706" },
+              };
+              const c = colors[p.v];
+              return (
+                <div key={p.name} style={{ background: c.bg, borderRadius: 8, padding: "10px 14px", borderLeft: `3px solid ${c.badge}` }}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>{p.name}</span>
+                    <span className="badge" style={{ background: c.badge, color: "#fff" }}>{p.v}</span>
+                  </div>
+                  <p style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>{p.r}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </section>
+      </Sec>
 
-      {/* ── FOOTER ─────────────────────────────────────────────────── */}
-      <footer style={{ padding: "20px 16px", borderTop: "1px solid #1e293b", textAlign: "center", background: "#060a12" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: 24, marginBottom: 10 }}>
-          <a href="https://x.com/Trace_Cohen" target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: "#F58426", textDecoration: "none", letterSpacing: 1 }}>↗ TWITTER</a>
-          <a href="mailto:t@nyvp.com" style={{ fontSize: 10, color: "#F58426", textDecoration: "none", letterSpacing: 1 }}>↗ EMAIL</a>
+      <div className="ed-divider max-w-5xl mx-auto" />
+
+      {/* ══ LEGENDS & ANOMALIES ═══════════════════════════════════ */}
+      <Sec id="legends">
+        <Head label="Outliers & Legends" title="The moments that defined 27 years." sub="Catastrophic disasters, historic upsets, legendary runs — ranked by impact." />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          {ANOMALIES.map((a, i) => {
+            const c = {
+              legendary:    { bg: "#fef3c7", border: "#d97706", badge: "#d97706", label: "LEGENDARY" },
+              historic:     { bg: "#dcfce7", border: "#16a34a", badge: "#16a34a", label: "HISTORIC" },
+              catastrophic: { bg: "#fee2e2", border: "#dc2626", badge: "#dc2626", label: "CATASTROPHIC" },
+            }[a.severity];
+            return (
+              <div key={i} style={{ background: c.bg, borderRadius: 10, padding: "16px 18px", borderLeft: `4px solid ${c.border}` }}>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", lineHeight: 1.25 }}>{a.title}</div>
+                  <span className="badge" style={{ background: c.badge, color: "#fff", flexShrink: 0 }}>{c.label}</span>
+                </div>
+                <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>{a.desc}</p>
+              </div>
+            );
+          })}
         </div>
-        <div style={{ fontSize: 8, letterSpacing: 2, color: "#374151" }}>VALUEADD VC × KNICKS ANALYTICS · DATA THROUGH MAY 24, 2026</div>
-        <div style={{ fontSize: 7, letterSpacing: 1, color: "#1e293b", marginTop: 4 }}>Source: Basketball Reference · knicks-franchise-dashboard.jsx</div>
+
+        {/* Best chemistry */}
+        <div className="lift p-5 mb-5">
+          <div className="section-label mb-4">Best Roster Chemistry</div>
+          <div className="flex flex-col gap-4">
+            {[
+              { name: "2025-26 Core", score: 95, players: "Brunson · KAT · Bridges · OG · Hart", why: "Villanova pipeline + perfectly complementary trades. Every role crystal clear. First time in 27 years everyone knew their job." },
+              { name: "1998-99 Finals Run", score: 90, players: "Sprewell · Houston · Ewing · Johnson · Camby", why: "6th-man mentality from every starter. Van Gundy built a brotherhood. No one expected the Finals. That was the point." },
+              { name: "2012-13 Melo Squad", score: 82, players: "Anthony · JR Smith · Chandler · Kidd · Felton", why: "Best defensive core in the Melo era. JR won 6th Man of the Year. 54 wins felt earned, not lucky." },
+            ].map((t, i) => (
+              <div key={i} style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                <div style={{ textAlign: "center", minWidth: 52 }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: i === 0 ? "var(--orange)" : "var(--blue)", letterSpacing: "-1px" }}>{t.score}</div>
+                  <div style={{ fontSize: 9, color: "var(--muted)", fontWeight: 600 }}>/ 100</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text)", marginBottom: 2 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, color: "var(--blue)", fontWeight: 500, marginBottom: 4 }}>{t.players}</div>
+                  <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>{t.why}</p>
+                  <div className="prog-track mt-3" style={{ maxWidth: 200 }}>
+                    <div className="prog-fill" style={{ width: `${t.score}%`, background: i === 0 ? "var(--orange)" : "var(--blue)" }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Hottest at the right time */}
+        <div className="lift p-5">
+          <div className="section-label mb-4">Hottest at the Right Time</div>
+          <div className="flex flex-col gap-4">
+            {[
+              { yr: "1999", ctx: "8-seed all the way to the Finals — beat the #1, #4, and #2 seeds along the way.", peak: "Sprewell averaged 22 PPG through the Finals run" },
+              { yr: "Feb 2012", ctx: "Linsanity — 7-game win streak from sleeping on teammates' couches to the back page of the Post.", peak: "Jeremy Lin: 22.5 PPG over the stretch, 38 vs Lakers" },
+              { yr: "2026", ctx: "11-2 in playoffs. Gentleman's sweep of Philly. Up 3-0 on Cleveland in the ECF.", peak: "Brunson averaging 30 PPG in the ECF. Bridges at 69.6% FG." },
+            ].map((h, i) => (
+              <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "12px 14px", background: "#fef3c7", borderRadius: 8, borderLeft: "4px solid var(--gold)" }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "var(--gold)", minWidth: 56, paddingTop: 1 }}>{h.yr}</div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 3 }}>{h.ctx}</p>
+                  <p style={{ fontSize: 11, color: "var(--muted)" }}>{h.peak}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Sec>
+
+      {/* ══ FOOTER ════════════════════════════════════════════════ */}
+      <footer style={{ borderTop: "1px solid var(--border)", background: "var(--surface)", padding: "24px 16px", marginTop: 24 }}>
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Ball size={22} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--blue)" }}>NYK Franchise Dashboard</span>
+          </div>
+          <div className="flex gap-6">
+            <a href="https://x.com/Trace_Cohen" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--blue)", fontWeight: 600, textDecoration: "none" }}>Twitter / X</a>
+            <a href="mailto:t@nyvp.com" style={{ fontSize: 12, color: "var(--blue)", fontWeight: 600, textDecoration: "none" }}>t@nyvp.com</a>
+          </div>
+          <div style={{ fontSize: 11, color: "var(--muted)" }}>Data through May 24, 2026 · ValueAdd VC</div>
+        </div>
       </footer>
     </div>
   );

@@ -23,7 +23,7 @@ export interface Season {
 }
 
 export const SEASONS: Season[] = [
-  { season: "1998-99", wins: 27, losses: 23, pct: .540, coach: "Jeff Van Gundy", playoffs: "NBA Finals", playoffResult: "Lost to Spurs 1-4", seed: 8, era: "Finals Run", leadScorer: "Allan Houston", leadPPG: 18.2, leadRebounder: "Patrick Ewing", leadRPG: 8.8, leadAssist: "Charlie Ward", leadAPG: 5.2, allStars: ["Patrick Ewing"], keyPlayers: ["Allan Houston","Latrell Sprewell","Patrick Ewing","Larry Johnson","Marcus Camby","Charlie Ward"], note: "8-seed magic run to Finals. Lockout-shortened 50-game season.", offRtg: 99.8, defRtg: 96.2, pace: 87.4 },
+  { season: "1998-99", wins: 27, losses: 23, pct: .540, coach: "Jeff Van Gundy", playoffs: "NBA Finals", playoffResult: "Lost to Spurs 1-4", seed: 8, era: "Finals Run", leadScorer: "Allan Houston", leadPPG: 18.2, leadRebounder: "Patrick Ewing", leadRPG: 8.8, leadAssist: "Charlie Ward", leadAPG: 5.2, allStars: [], keyPlayers: ["Allan Houston","Latrell Sprewell","Patrick Ewing","Larry Johnson","Marcus Camby","Charlie Ward"], note: "8-seed magic run to Finals. Lockout-shortened 50-game season. No All-Star Game played (cancelled due to lockout).", offRtg: 99.8, defRtg: 96.2, pace: 87.4 },
   { season: "1999-00", wins: 50, losses: 32, pct: .610, coach: "Jeff Van Gundy", playoffs: "ECF", playoffResult: "Lost to Pacers 2-4", seed: 3, era: "Finals Run", leadScorer: "Allan Houston", leadPPG: 19.7, leadRebounder: "Patrick Ewing", leadRPG: 9.8, leadAssist: "Charlie Ward", leadAPG: 4.7, allStars: ["Allan Houston"], keyPlayers: ["Allan Houston","Latrell Sprewell","Patrick Ewing","Larry Johnson","Marcus Camby","Kurt Thomas"], note: "First 50-win season since 96-97. Ewing's final full season.", offRtg: 101.3, defRtg: 100.4, pace: 89.8 },
   { season: "2000-01", wins: 48, losses: 34, pct: .585, coach: "Jeff Van Gundy", playoffs: "First Round", playoffResult: "Lost to Raptors 2-3", seed: 4, era: "Post-Ewing", leadScorer: "Allan Houston", leadPPG: 20.2, leadRebounder: "Marcus Camby", leadRPG: 11.5, leadAssist: "Mark Jackson", leadAPG: 5.5, allStars: ["Allan Houston"], keyPlayers: ["Allan Houston","Latrell Sprewell","Marcus Camby","Kurt Thomas","Glen Rice"], note: "Ewing traded to Seattle. First-round upset by Raptors.", offRtg: 100.2, defRtg: 98.9, pace: 90.1 },
   { season: "2001-02", wins: 30, losses: 52, pct: .366, coach: "Don Chaney", playoffs: "Missed", playoffResult: "DNQ", seed: null, era: "Dark Ages", leadScorer: "Allan Houston", leadPPG: 20.0, leadRebounder: "Kurt Thomas", leadRPG: 8.8, leadAssist: "Mark Jackson", leadAPG: 6.2, allStars: [], keyPlayers: ["Allan Houston","Latrell Sprewell","Kurt Thomas","Shandon Anderson"], note: "First missed playoffs since 1986-87. End of 14-year streak.", offRtg: 97.1, defRtg: 101.5, pace: 89.2 },
@@ -119,7 +119,7 @@ export const ERAS = [
 ];
 
 export const ANOMALIES = [
-  { title: "8-Seed Finals Run (1999)", desc: "The first and only 8-seed in NBA history to reach the Finals. Won 27 of 50 lockout games, beat #1 Miami, #4 Atlanta, #2 Indiana before falling to Spurs.", severity: "legendary" as const },
+  { title: "8-Seed Finals Run (1999)", desc: "The first 8-seed in NBA history to reach the Finals — a feat only matched 24 years later by the 2023 Miami Heat. Won 27 of 50 lockout games, beat #1 Miami, #4 Atlanta, #2 Indiana before falling to Spurs.", severity: "legendary" as const },
   { title: "$124M Payroll → 23 Wins (2005-06)", desc: "NBA's highest payroll at $124M — $74.5M over the cap — and just 23 wins. Larry Brown fired after one season. Historic ROI disaster.", severity: "catastrophic" as const },
   { title: "17-65 × 2 (2015 & 2019)", desc: "Franchise-worst 17-65 TWICE in five years. Phil's triangle experiment, then Fizdale's tank. Same number, same misery, different decades.", severity: "catastrophic" as const },
   { title: "Linsanity — 7 Straight Wins (Feb 2012)", desc: "Jeremy Lin went from sleeping on teammates' couches to global phenomenon. 38 pts vs Lakers. 22.5 PPG in the streak. Rockets signed him to a poison-pill deal; Knicks chose not to match.", severity: "legendary" as const },
@@ -155,11 +155,11 @@ export const NEMESIS = [
   {
     team: "Miami Heat", bg: "#98002E", accent: "#F9A01B",
     seriesW: 1, seriesL: 2,
-    note: "The 1999 Houston shot is immortal. LeBron-era Heat dominated the post-2010 Knicks.",
+    note: "The 1999 Houston shot is immortal. Lost twice since — once to LeBron's dynasty, once to Jimmy Butler's 8-seed squad that then went to the Finals.",
     history: [
       { year: "1999", round: "R1",  result: "W" as const, detail: "Won 3-2 — The Allan Houston Shot" },
       { year: "2012", round: "R1",  result: "L" as const, detail: "Lost 1-4 to LeBron's Heat" },
-      { year: "2023", round: "CSF", result: "L" as const, detail: "Lost 2-4 despite a 47-win season" },
+      { year: "2023", round: "CSF", result: "L" as const, detail: "Lost 2-4 — Heat went on to the Finals as 8-seed" },
     ],
   },
   {

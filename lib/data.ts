@@ -50,7 +50,7 @@ export const SEASONS: Season[] = [
   { season: "2022-23", wins: 47, losses: 35, pct: .573, coach: "Tom Thibodeau", playoffs: "Conf Semis", playoffResult: "Lost to Heat 2-4", seed: 5, era: "Brunson Era", leadScorer: "Jalen Brunson", leadPPG: 24.0, leadRebounder: "Julius Randle", leadRPG: 10.0, leadAssist: "Jalen Brunson", leadAPG: 6.2, allStars: ["Julius Randle","Jalen Brunson"], keyPlayers: ["Jalen Brunson","Julius Randle","RJ Barrett","Josh Hart","Mitchell Robinson","Immanuel Quickley"], note: "Brunson's breakout. +10 wins overnight. First Conf Semis since 2013.", offRtg: 114.5, defRtg: 112.3, pace: 97.7 },
   { season: "2023-24", wins: 50, losses: 32, pct: .610, coach: "Tom Thibodeau", playoffs: "Conf Semis", playoffResult: "Lost to Pacers 3-4", seed: 2, era: "Brunson Era", leadScorer: "Jalen Brunson", leadPPG: 28.7, leadRebounder: "Julius Randle", leadRPG: 9.2, leadAssist: "Jalen Brunson", leadAPG: 6.7, allStars: ["Jalen Brunson","Julius Randle"], keyPlayers: ["Jalen Brunson","Julius Randle","OG Anunoby","Josh Hart","Donte DiVincenzo","Mitchell Robinson","Miles McBride"], note: "OG Anunoby trade transforms roster. Brunson 28.7 PPG. Heartbreaking Game 7 loss.", offRtg: 118.3, defRtg: 113.5, pace: 100.4 },
   { season: "2024-25", wins: 51, losses: 31, pct: .622, coach: "Tom Thibodeau", playoffs: "ECF", playoffResult: "Lost to Pacers 2-4", seed: 3, era: "Brunson Era", leadScorer: "Jalen Brunson", leadPPG: 25.7, leadRebounder: "Karl-Anthony Towns", leadRPG: 13.9, leadAssist: "Jalen Brunson", leadAPG: 7.5, allStars: ["Jalen Brunson","Karl-Anthony Towns"], keyPlayers: ["Jalen Brunson","Karl-Anthony Towns","Mikal Bridges","OG Anunoby","Josh Hart","Miles McBride"], note: "KAT & Bridges arrive. Beat Celtics in semis. First ECF since 2000.", offRtg: 117.8, defRtg: 113.0, pace: 100.1 },
-  { season: "2025-26", wins: 53, losses: 29, pct: .646, coach: "Tom Thibodeau", playoffs: "ECF (3-0)", playoffResult: "In Progress — 3-0 vs CLE", seed: 3, era: "Brunson Era", leadScorer: "Jalen Brunson", leadPPG: 26.4, leadRebounder: "Karl-Anthony Towns", leadRPG: 13.5, leadAssist: "Jalen Brunson", leadAPG: 7.8, allStars: ["Jalen Brunson","Karl-Anthony Towns"], keyPlayers: ["Jalen Brunson","Karl-Anthony Towns","Mikal Bridges","OG Anunoby","Josh Hart","Mitchell Robinson","Miles McBride","Jordan Clarkson","Jose Alvarado"], note: "NBA Cup champions. 120-66 blowout of Nets. Swept 76ers R2. Up 3-0 vs Cavs in ECF.", offRtg: 118.5, defRtg: 112.8, pace: 100.8 },
+  { season: "2025-26", wins: 53, losses: 29, pct: .646, coach: "Tom Thibodeau", playoffs: "NBA Finals", playoffResult: "Swept CLE 4-0 — NBA Finals (first since 1999)", seed: 3, era: "Brunson Era", leadScorer: "Jalen Brunson", leadPPG: 26.4, leadRebounder: "Karl-Anthony Towns", leadRPG: 13.5, leadAssist: "Jalen Brunson", leadAPG: 7.8, allStars: ["Jalen Brunson","Karl-Anthony Towns"], keyPlayers: ["Jalen Brunson","Karl-Anthony Towns","Mikal Bridges","OG Anunoby","Josh Hart","Mitchell Robinson","Miles McBride","Jordan Clarkson","Jose Alvarado"], note: "NBA Cup champions. 120-66 blowout of Nets. Swept 76ers R2. Swept Cavs 4-0 in ECF. First NBA Finals since 1999.", offRtg: 118.5, defRtg: 112.8, pace: 100.8 },
 ];
 
 export interface PlayoffRound {
@@ -75,24 +75,25 @@ export const PLAYOFF_2026: PlayoffRound[] = [
     { game: 3, result: "W", score: "108-94",  loc: "Away", brunsonPts: 26, katPts: 22, bridgesPts: 17 },
     { game: 4, result: "W", score: "144-114", loc: "Away", brunsonPts: 38, katPts: 28, bridgesPts: 22 },
   ]},
-  { round: "ECF vs Cavs", opponent: "Cleveland Cavaliers", result: "W 3-0 (ongoing)", games: [
+  { round: "ECF vs Cavs", opponent: "Cleveland Cavaliers", result: "W 4-0 — SWEEP", games: [
     { game: 1, result: "W", score: "115-104", loc: "Home", brunsonPts: 38, katPts: 13, bridgesPts: 18 },
     { game: 2, result: "W", score: "109-93",  loc: "Home", brunsonPts: 19, katPts: 18, bridgesPts: 19 },
     { game: 3, result: "W", score: "121-108", loc: "Away", brunsonPts: 33, katPts: 21, bridgesPts: 16 },
+    { game: 4, result: "W", score: "112-106", loc: "Away", brunsonPts: 34, katPts: 22, bridgesPts: 20 },
   ]},
 ];
 
 export const ECF_STATS = [
-  { name: "Jalen Brunson",    pts: 30.0, reb: 4.3,  ast: 10.3, fgPct: 48.3, threePct: 15.4, pm: 48,  role: "Star" },
-  { name: "Karl-Anthony Towns", pts: 17.3, reb: 13.0, ast: 3.0,  fgPct: 50.0, threePct: 40.0, pm: 31,  role: "Star" },
-  { name: "Mikal Bridges",    pts: 18.3, reb: 4.0,  ast: 2.3,  fgPct: 69.6, threePct: 60.0, pm: 52,  role: "Star" },
-  { name: "OG Anunoby",       pts: 13.5, reb: 4.5,  ast: 2.5,  fgPct: 41.2, threePct: 30.0, pm: 37,  role: "Star" },
-  { name: "Josh Hart",        pts: 19.5, reb: 5.5,  ast: 5.5,  fgPct: 46.9, threePct: 37.5, pm: -5,  role: "Core" },
-  { name: "Mitchell Robinson",pts: 4.0,  reb: 5.0,  ast: 0.5,  fgPct: 60.0, threePct: 0,    pm: -9,  role: "Core" },
-  { name: "Landry Shamet",    pts: 4.5,  reb: 2.5,  ast: 0,    fgPct: 60.0, threePct: 100.0,pm: 18,  role: "Bench" },
-  { name: "Miles McBride",    pts: 2.5,  reb: 3.0,  ast: 2.0,  fgPct: 11.1, threePct: 14.3, pm: 0,   role: "Bench" },
-  { name: "Jordan Clarkson",  pts: 3.5,  reb: 1.0,  ast: 0,    fgPct: 60.0, threePct: 50.0, pm: 1,   role: "Bench" },
-  { name: "Jose Alvarado",    pts: 2.0,  reb: 1.0,  ast: 0.5,  fgPct: 66.7, threePct: 0,    pm: -3,  role: "Bench" },
+  { name: "Jalen Brunson",    pts: 31.0, reb: 4.3,  ast: 10.3, fgPct: 49.1, threePct: 22.0, pm: 62,  role: "Star" },
+  { name: "Karl-Anthony Towns", pts: 18.5, reb: 12.8, ast: 3.0,  fgPct: 50.4, threePct: 40.0, pm: 43,  role: "Star" },
+  { name: "Mikal Bridges",    pts: 18.3, reb: 4.0,  ast: 2.3,  fgPct: 68.0, threePct: 62.0, pm: 68,  role: "Star" },
+  { name: "OG Anunoby",       pts: 13.5, reb: 4.5,  ast: 2.5,  fgPct: 41.2, threePct: 30.0, pm: 48,  role: "Star" },
+  { name: "Josh Hart",        pts: 19.5, reb: 5.5,  ast: 5.5,  fgPct: 46.9, threePct: 37.5, pm: -3,  role: "Core" },
+  { name: "Mitchell Robinson",pts: 4.0,  reb: 5.3,  ast: 0.5,  fgPct: 60.0, threePct: 0,    pm: -5,  role: "Core" },
+  { name: "Landry Shamet",    pts: 4.5,  reb: 2.5,  ast: 0,    fgPct: 60.0, threePct: 100.0,pm: 24,  role: "Bench" },
+  { name: "Miles McBride",    pts: 2.8,  reb: 3.0,  ast: 2.0,  fgPct: 14.3, threePct: 16.7, pm: 3,   role: "Bench" },
+  { name: "Jordan Clarkson",  pts: 3.8,  reb: 1.0,  ast: 0,    fgPct: 60.0, threePct: 50.0, pm: 4,   role: "Bench" },
+  { name: "Jose Alvarado",    pts: 2.0,  reb: 1.0,  ast: 0.5,  fgPct: 66.7, threePct: 0,    pm: -2,  role: "Bench" },
 ];
 
 export const ERA_COLORS: Record<string, string> = {

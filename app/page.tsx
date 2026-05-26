@@ -225,13 +225,13 @@ export default function Home() {
                 KNICKS
               </h1>
               <div style={{ fontSize: "clamp(13px,2vw,16px)", color: "rgba(255,255,255,0.6)", marginTop: 10, letterSpacing: "0.08em" }}>
-                Franchise Dashboard · 1999 Finals → 2026 ECF
+                Franchise Dashboard · 1999 Finals → 2026 NBA Finals
               </div>
               <div className="flex flex-wrap gap-2 mt-6">
                 {[
-                  { v: "3-0", l: "ECF Lead" },
+                  { v: "Finals!", l: "First Time Since '99" },
                   { v: "53-29", l: "This Season" },
-                  { v: "11-2", l: "Playoff Record" },
+                  { v: "12-2", l: "Playoff Record" },
                   { v: "★ Cup", l: "NBA Cup 2026" },
                 ].map(c => (
                   <div key={c.l} className="hero-chip">
@@ -590,7 +590,7 @@ export default function Home() {
 
       {/* ══ 2026 PLAYOFF RUN ══════════════════════════════════════ */}
       <Sec id="playoffs">
-        <Head label="Live 2026 Playoffs" title="11-2 record. One win from the Finals." sub="Game-by-game log for all 13 playoff games. Brunson / KAT / Bridges scoring breakdown." />
+        <Head label="2026 Playoff Run" title="12-2 record. NBA Finals bound for the first time since 1999." sub="Game-by-game log for all 14 playoff games. Brunson / KAT / Bridges scoring breakdown." />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
           {PLAYOFF_2026.map((round, ri) => (
@@ -619,7 +619,7 @@ export default function Home() {
 
         {/* Scoring chart */}
         <div className="lift p-5 sm:p-6 mb-5">
-          <div className="section-label mb-1">Big 3 Scoring — All 13 Games</div>
+          <div className="section-label mb-1">Big 3 Scoring — All 14 Games</div>
           <div className="flex gap-5 mb-4">
             {[["var(--orange)","Brunson"],["var(--blue)","KAT"],["var(--green)","Bridges"]].map(([c,n]) => (
               <div key={n} className="flex items-center gap-1.5">
@@ -644,7 +644,7 @@ export default function Home() {
         {/* ECF stats table */}
         <div className="lift overflow-hidden">
           <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--border)" }}>
-            <div className="section-label" style={{ color: "var(--gold)" }}>ECF Player Stats vs Cleveland</div>
+            <div className="section-label" style={{ color: "var(--gold)" }}>ECF Player Stats vs Cleveland — 4-0 Sweep</div>
           </div>
           <div style={{ overflowX: "auto" }}>
             <table className="data-table">
@@ -964,7 +964,7 @@ export default function Home() {
             {[
               { yr: "1999", ctx: "8-seed all the way to the Finals — beat the #1, #4, and #2 seeds along the way.", peak: "Sprewell averaged 22 PPG through the Finals run" },
               { yr: "Feb 2012", ctx: "Linsanity — 7-game win streak from sleeping on teammates' couches to the back page of the Post.", peak: "Jeremy Lin: 22.5 PPG over the stretch, 38 pts vs Lakers" },
-              { yr: "2026", ctx: "11-2 in playoffs. Gentleman's sweep of Philly. Up 3-0 on Cleveland in the ECF.", peak: "Brunson averaging 30 PPG in the ECF. Bridges at 69.6% FG." },
+              { yr: "2026", ctx: "12-2 in playoffs. Swept Philly in R2. Swept Cleveland in ECF. NBA Finals for the first time since 1999.", peak: "Brunson averaging 31.0 PPG in ECF. Bridges shot 68% FG, 62% from 3." },
             ].map((h, i) => (
               <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "14px 16px", background: "#fef3c7", borderRadius: 8, borderLeft: "4px solid var(--gold)" }}>
                 <div style={{ fontSize: 16, fontWeight: 900, color: "var(--gold)", minWidth: 60, paddingTop: 1 }}>{h.yr}</div>
@@ -989,7 +989,7 @@ export default function Home() {
             <a href="https://x.com/Trace_Cohen" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "var(--blue)", fontWeight: 600, textDecoration: "none" }}>Twitter / X</a>
             <a href="mailto:t@nyvp.com" style={{ fontSize: 12, color: "var(--blue)", fontWeight: 600, textDecoration: "none" }}>t@nyvp.com</a>
           </div>
-          <div style={{ fontSize: 11, color: "var(--muted)" }}>Data through May 24, 2026 · ValueAdd VC</div>
+          <div style={{ fontSize: 11, color: "var(--muted)" }}>Data through May 26, 2026 · ValueAdd VC</div>
         </div>
       </footer>
     </div>

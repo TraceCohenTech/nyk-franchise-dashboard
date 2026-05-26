@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "NYK Franchise Dashboard — 1999 Finals → 2026 ECF",
+  title: "NYK Franchise Dashboard — 1999 Finals → 2026 NBA Finals",
   description: "27 seasons of New York Knicks data: wins, losses, playoff runs, coaching records, and the Brunson era.",
 };
 
